@@ -1,0 +1,319 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Superfícies (tema claro) */
+  --bg-primary: #f4f5fb;
+  --bg-secondary: #eef0f8;
+  --bg-card: #ffffff;
+  --bg-hover: #eef1fb;
+  --bg-subtle: #f8f9fd;
+
+  /* Texto */
+  --text-primary: #1b1d2e;
+  --text-secondary: #6b7088;
+  --text-on-accent: #ffffff;
+
+  /* Acento índigo */
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-soft: rgba(99, 102, 241, 0.10);
+
+  /* Estados */
+  --success: #16a34a;
+  --warning: #d97706;
+  --error: #ef4444;
+
+  /* Bordas */
+  --border: #e3e6f2;
+  --border-soft: #edeef6;
+
+  /* Superfície de código (permanece escura em qualquer tema) */
+  --code-bg: #1a1b2e;
+  --code-surface: #20223a;
+  --code-border: #2d2f4a;
+  --code-text: #e2e4f0;
+  --code-text-dim: #9396b8;
+
+  /* Sombras suaves para fundo claro */
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 8px 24px -10px rgba(16, 24, 40, 0.14);
+  --shadow-lg: 0 20px 48px -16px rgba(16, 24, 40, 0.20);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--text-primary);
+  min-height: 100vh;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-primary);
+  background-image:
+    radial-gradient(55rem 55rem at 8% -12%, rgba(99, 102, 241, 0.08), transparent 60%),
+    radial-gradient(48rem 48rem at 100% 0%, rgba(139, 92, 246, 0.07), transparent 55%),
+    radial-gradient(42rem 42rem at 50% 120%, rgba(22, 163, 74, 0.04), transparent 60%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
+/* Foco acessível e suave */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d3d7e6;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b9bed4;
+  background-clip: padding-box;
+}
+
+/* Utilitários de superfície e movimento */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(140%) blur(14px);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+}
+
+.card-surface {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-md);
+}
+
+.hover-lift {
+  transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease),
+    border-color 0.35s var(--ease);
+}
+
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.gradient-text {
+  background: linear-gradient(120deg, #6366f1, #8b5cf6 55%, #d946ef);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Superfície de código (IDE / blocos) — sempre escura */
+.code-surface {
+  background: var(--code-bg);
+  color: var(--code-text);
+  border: 1px solid var(--code-border);
+}
+
+/* Terminal output */
+.terminal-output {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.terminal-output .stdout {
+  color: var(--code-text);
+}
+
+.terminal-output .stderr {
+  color: #ff8585;
+}
+
+.terminal-output .info {
+  color: #8b9dff;
+}
+
+/* Markdown styles */
+.lesson-content h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.lesson-content h2 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--accent-hover);
+}
+
+.lesson-content h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.lesson-content p {
+  margin-bottom: 0.75rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.lesson-content strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.lesson-content code {
+  background: var(--accent-soft);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9em;
+  color: var(--accent-hover);
+}
+
+.lesson-content pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 1rem;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: 1rem 0;
+  border: 1px solid var(--code-border);
+}
+
+.lesson-content pre code {
+  background: none;
+  padding: 0;
+  color: var(--code-text);
+}
+
+.lesson-content ul,
+.lesson-content ol {
+  margin-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.lesson-content li {
+  margin-bottom: 0.35rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Animações */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.45s var(--ease) both;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.5s var(--ease) both;
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.scale-in {
+  animation: scaleIn 0.35s var(--ease) both;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(99, 102, 241, 0); }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Botão Run */
+.btn-run {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-run:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+}
+
+.btn-run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Badges de linguagem */
+.badge-python {
+  background: linear-gradient(135deg, #306998, #FFD43B);
+  color: white;
+}
+
+.badge-javascript {
+  background: linear-gradient(135deg, #f7df1e, #d4a017);
+  color: #1a1a1a;
+}

@@ -1,0 +1,27 @@
+# Blueprint do Render para o backend da Plataforma de Estudo da Nichole.
+# No Render: New → Blueprint → conecte o repositório → ele lê este arquivo.
+# (Você também pode criar o Web Service manualmente; veja DEPLOY.md.)
+services:
+  - type: web
+    name: nichole-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Segurança: mantém a execução de código DESLIGADA em servidor público.
+      - key: ENABLE_CODE_EXECUTION
+        value: "false"
+      # Defina manualmente no painel do Render com a URL do seu frontend na Vercel,
+      # ex: https://plataforma-nichole.vercel.app
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # Connection string do MongoDB Atlas (banco grátis) — defina no painel do Render.
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: nichole_study

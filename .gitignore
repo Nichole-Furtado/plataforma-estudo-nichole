@@ -1,0 +1,28 @@
+# Dependências
+node_modules/
+**/node_modules/
+
+# Build do Next.js
+.next/
+out/
+**/.next/
+
+# Variáveis de ambiente (nunca commitar segredos)
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+# Dados locais (persistência em modo arquivo)
+backend/src/data/financeiro.json
+backend/src/data/store/
+
+# Logs e sistema
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Editor / preview
+.claude/launch.json
