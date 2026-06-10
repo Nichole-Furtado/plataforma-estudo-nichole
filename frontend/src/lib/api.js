@@ -1,10 +1,23 @@
+import { getToken, removeToken } from '@/lib/auth';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 async function apiFetch(path, options = {}) {
+  const token = getToken();
+  const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
+
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: { 'Content-Type': 'application/json', ...authHeader, ...options.headers },
     ...options,
   });
+
+  // Sessão expirada ou inválida → volta para login
+  if (res.status === 401) {
+    removeToken();
+    if (typeof window !== 'undefined') window.location.href = '/login';
+    throw new Error('Sessão expirada');
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
     throw new Error(err.error || `HTTP ${res.status}`);
