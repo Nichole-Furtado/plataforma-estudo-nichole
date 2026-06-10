@@ -18,16 +18,25 @@ let mode = 'file';
 
 async function connect() {
   if (MONGODB_URI) {
-    const { MongoClient } = require('mongodb');
-    const client = new MongoClient(MONGODB_URI);
-    await client.connect();
-    collection = client.db(DB_NAME).collection('appdata');
-    mode = 'mongo';
-    console.log('🗄️  Persistência: MongoDB');
+    try {
+      const { MongoClient } = require('mongodb');
+      const client = new MongoClient(MONGODB_URI, {
+        serverSelectionTimeoutMS: 10000,
+        connectTimeoutMS: 10000,
+      });
+      await client.connect();
+      collection = client.db(DB_NAME).collection('appdata');
+      mode = 'mongo';
+      console.log('Persistência: MongoDB Atlas conectado.');
+    } catch (err) {
+      console.error('AVISO: Falha ao conectar no MongoDB, usando arquivos locais.', err.message);
+      fs.mkdirSync(FILE_DIR, { recursive: true });
+      mode = 'file';
+    }
   } else {
     fs.mkdirSync(FILE_DIR, { recursive: true });
     mode = 'file';
-    console.log('🗄️  Persistência: arquivos locais (defina MONGODB_URI para usar banco)');
+    console.log('Persistência: arquivos locais (defina MONGODB_URI para usar banco)');
   }
 }
 
