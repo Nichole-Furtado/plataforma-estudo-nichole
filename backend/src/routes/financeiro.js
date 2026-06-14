@@ -180,16 +180,33 @@ router.patch('/:yearMonth/entry/:id', async (req, res) => {
   if (parcelas !== undefined) entry.parcelas = parseInt(parcelas) > 1 ? parseInt(parcelas) : undefined;
   if (parcelaAtual !== undefined) entry.parcelaAtual = parseInt(parcelaAtual) || 1;
 
-  // Propaga descrição e valor para todas as parcelas do mesmo grupo
+  // Propaga descrição, valor e total de parcelas para todas as parcelas do mesmo grupo
   if (updateGroup && entry.grupoId) {
     const grupoId = entry.grupoId;
-    Object.values(financeiro()).forEach((monthData) => {
+    const newTotal = parcelas !== undefined ? (parseInt(parcelas) > 1 ? parseInt(parcelas) : null) : null;
+
+    Object.keys(financeiro()).forEach((ym) => {
+      const monthData = financeiro()[ym];
       if (!monthData || typeof monthData !== 'object') return;
-      [...(monthData.incomes || []), ...(monthData.expenses || [])].forEach((e) => {
-        if (e.grupoId === grupoId && e.id !== id) {
-          if (description !== undefined) e.description = String(description).trim();
-          if (value !== undefined) e.value = parseValue(value);
+
+      ['incomes', 'expenses'].forEach((list) => {
+        if (!Array.isArray(monthData[list])) return;
+
+        // Remove parcelas que ultrapassam o novo total (ex: 8/7, 9/7, 10/7)
+        if (newTotal !== null) {
+          monthData[list] = monthData[list].filter(
+            (e) => !(e.grupoId === grupoId && e.id !== id && e.parcelaAtual > newTotal)
+          );
         }
+
+        // Atualiza as parcelas restantes
+        monthData[list].forEach((e) => {
+          if (e.grupoId === grupoId && e.id !== id) {
+            if (description !== undefined) e.description = String(description).trim();
+            if (value !== undefined) e.value = parseValue(value);
+            if (newTotal !== null) e.parcelas = newTotal;
+          }
+        });
       });
     });
   }
