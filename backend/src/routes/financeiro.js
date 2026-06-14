@@ -52,8 +52,18 @@ router.post('/:yearMonth/entry', async (req, res) => {
     return res.status(400).json({ error: 'Descrição é obrigatória' });
   }
 
+  const { parcelas, parcelaAtual } = req.body;
   const month = getMonth(req.params.yearMonth);
-  const entry = { id: makeId(), description: description.trim(), value: parseValue(value), active: true };
+  const entry = {
+    id: makeId(),
+    description: description.trim(),
+    value: parseValue(value),
+    active: true,
+    ...(parcelas && parseInt(parcelas) > 1 ? {
+      parcelas: parseInt(parcelas),
+      parcelaAtual: parseInt(parcelaAtual) || 1,
+    } : {}),
+  };
   (type === 'income' ? month.incomes : month.expenses).push(entry);
   await persist('financeiro');
   res.json({ message: 'Lançamento adicionado', entry, data: month });
@@ -72,6 +82,8 @@ router.patch('/:yearMonth/entry/:id', async (req, res) => {
   if (description !== undefined) entry.description = String(description).trim();
   if (value !== undefined) entry.value = parseValue(value);
   if (active !== undefined) entry.active = Boolean(active);
+  if (parcelas !== undefined) entry.parcelas = parseInt(parcelas) || undefined;
+  if (parcelaAtual !== undefined) entry.parcelaAtual = parseInt(parcelaAtual) || 1;
   await persist('financeiro');
   res.json({ message: 'Lançamento atualizado', entry, data: month });
 });

@@ -94,10 +94,10 @@ export async function fetchFinanceiro(yearMonth) {
   return apiFetch(`/api/financeiro/${yearMonth}`);
 }
 
-export async function addFinanceiroEntry(yearMonth, type, description, value) {
+export async function addFinanceiroEntry(yearMonth, type, description, value, extras = {}) {
   return apiFetch(`/api/financeiro/${yearMonth}/entry`, {
     method: 'POST',
-    body: JSON.stringify({ type, description, value }),
+    body: JSON.stringify({ type, description, value, ...extras }),
   });
 }
 

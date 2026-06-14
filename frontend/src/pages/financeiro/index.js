@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Scale,
-  Plus, Pencil, Trash2, Check, X, Inbox,
+  Plus, Pencil, Trash2, Check, X, Inbox, CreditCard,
 } from 'lucide-react';
 import {
   fetchFinanceiro,
@@ -64,9 +64,9 @@ export default function FinanceiroPage() {
     setExpenses(data.expenses || []);
   };
 
-  const handleAdd = async (type, description, value) => {
+  const handleAdd = async (type, description, value, extras = {}) => {
     try {
-      const res = await addFinanceiroEntry(yearMonth, type, description, value);
+      const res = await addFinanceiroEntry(yearMonth, type, description, value, extras);
       applyData(res.data);
     } catch (err) {
       alert(err.message);
@@ -227,12 +227,22 @@ function SummaryCard({ label, value, Icon, color, delay = 0 }) {
 function EntrySection({ title, Icon, accent, type, entries, total, placeholder, onAdd, onUpdate, onRemove, delay = 0 }) {
   const [desc, setDesc] = useState('');
   const [val, setVal] = useState('');
+  const [parcelas, setParcelas] = useState('');
+  const [parcelaAtual, setParcelaAtual] = useState('1');
+
+  const isExpense = type === 'expense';
+  const totalParcelas = parseInt(parcelas) || 1;
 
   const submit = () => {
     if (!desc.trim()) return;
-    onAdd(type, desc.trim(), parseFloat(val) || 0);
+    const extras = isExpense && totalParcelas > 1
+      ? { parcelas: totalParcelas, parcelaAtual: parseInt(parcelaAtual) || 1 }
+      : {};
+    onAdd(type, desc.trim(), parseFloat(val) || 0, extras);
     setDesc('');
     setVal('');
+    setParcelas('');
+    setParcelaAtual('1');
   };
 
   return (
@@ -248,39 +258,77 @@ function EntrySection({ title, Icon, accent, type, entries, total, placeholder, 
           </span>
           {title}
           <span className="text-xs font-medium text-[var(--text-secondary)]">
-          ({entries.filter(e => e.active !== false).length}/{entries.length})
-        </span>
+            ({entries.filter(e => e.active !== false).length}/{entries.length})
+          </span>
         </h2>
         <span className="font-bold tabular-nums" style={{ color: accent }}>{brl(total)}</span>
       </div>
 
       {/* Add form */}
-      <div className="px-5 py-4 border-b border-[var(--border-soft)] flex flex-col sm:flex-row gap-2">
-        <input
-          type="text"
-          value={desc}
-          onChange={(e) => setDesc(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
-          placeholder={placeholder}
-          className="flex-1 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all duration-200"
-        />
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
-          placeholder="0,00"
-          className="w-full sm:w-32 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all duration-200 tabular-nums"
-        />
-        <button
-          onClick={submit}
-          disabled={!desc.trim()}
-          className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-        >
-          <Plus size={16} strokeWidth={2.4} /> Adicionar
-        </button>
+      <div className="px-5 py-4 border-b border-[var(--border-soft)] flex flex-col gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            placeholder={placeholder}
+            className="flex-1 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all duration-200"
+          />
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            placeholder="0,00"
+            className="w-full sm:w-28 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all duration-200 tabular-nums"
+          />
+          <button
+            onClick={submit}
+            disabled={!desc.trim()}
+            className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            <Plus size={16} strokeWidth={2.4} /> Adicionar
+          </button>
+        </div>
+
+        {/* Parcelas (só para gastos) */}
+        {isExpense && (
+          <div className="flex items-center gap-2">
+            <CreditCard size={14} style={{ color: 'var(--text-secondary)' }} className="shrink-0" />
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Parcelas:</span>
+            <input
+              type="number"
+              min="1"
+              max="99"
+              value={parcelas}
+              onChange={(e) => { setParcelas(e.target.value); if (!parcelaAtual) setParcelaAtual('1'); }}
+              placeholder="1"
+              className="w-14 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-center tabular-nums focus:outline-none focus:border-[var(--accent)] transition-all"
+            />
+            {totalParcelas > 1 && (
+              <>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>· Parcela atual:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={totalParcelas}
+                  value={parcelaAtual}
+                  onChange={(e) => setParcelaAtual(e.target.value)}
+                  className="w-14 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-center tabular-nums focus:outline-none focus:border-[var(--accent)] transition-all"
+                />
+                <span
+                  className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+                >
+                  {parcelaAtual || 1}/{totalParcelas}
+                </span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Entries list */}
@@ -313,15 +361,25 @@ function EntryRow({ entry, accent, striped, onUpdate, onRemove }) {
   const [editing, setEditing] = useState(false);
   const [desc, setDesc] = useState(entry.description);
   const [val, setVal] = useState(entry.value);
+  const [parcelaAtual, setParcelaAtual] = useState(entry.parcelaAtual || 1);
+  const [parcelas, setParcelas] = useState(entry.parcelas || 1);
+
+  const hasParcelas = (entry.parcelas || 1) > 1;
 
   const save = () => {
-    onUpdate(entry.id, { description: desc, value: parseFloat(val) || 0 });
+    onUpdate(entry.id, {
+      description: desc,
+      value: parseFloat(val) || 0,
+      ...(parcelas > 1 ? { parcelas: parseInt(parcelas), parcelaAtual: parseInt(parcelaAtual) } : {}),
+    });
     setEditing(false);
   };
 
   const cancel = () => {
     setDesc(entry.description);
     setVal(entry.value);
+    setParcelaAtual(entry.parcelaAtual || 1);
+    setParcelas(entry.parcelas || 1);
     setEditing(false);
   };
 
@@ -375,6 +433,17 @@ function EntryRow({ entry, accent, striped, onUpdate, onRemove }) {
           >
             {entry.description}
           </span>
+          {/* Chip de parcelas */}
+          {hasParcelas && (
+            <span
+              className="shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+              title={`Parcela ${entry.parcelaAtual} de ${entry.parcelas}`}
+            >
+              <CreditCard size={10} />
+              {entry.parcelaAtual}/{entry.parcelas}
+            </span>
+          )}
           <span
             className="text-sm font-semibold tabular-nums transition-all duration-200"
             style={{
