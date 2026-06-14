@@ -88,6 +88,30 @@ export async function toggleTrackerDay(yearMonth, subject, day) {
   });
 }
 
+// ========== Rendas Fixas ==========
+
+export async function fetchRendasFixas() {
+  return apiFetch('/api/financeiro/fixed');
+}
+
+export async function addRendaFixa(description, value) {
+  return apiFetch('/api/financeiro/fixed', {
+    method: 'POST',
+    body: JSON.stringify({ description, value }),
+  });
+}
+
+export async function updateRendaFixa(id, data) {
+  return apiFetch(`/api/financeiro/fixed/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function removeRendaFixa(id) {
+  return apiFetch(`/api/financeiro/fixed/${id}`, { method: 'DELETE' });
+}
+
 // ========== Planilha Financeira ==========
 
 export async function fetchFinanceiro(yearMonth) {
