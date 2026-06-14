@@ -112,6 +112,30 @@ export async function removeRendaFixa(id) {
   return apiFetch(`/api/financeiro/fixed/${id}`, { method: 'DELETE' });
 }
 
+// ========== Gastos Fixos ==========
+
+export async function fetchGastosFixos() {
+  return apiFetch('/api/financeiro/fixed-expenses');
+}
+
+export async function addGastoFixo(description, value) {
+  return apiFetch('/api/financeiro/fixed-expenses', {
+    method: 'POST',
+    body: JSON.stringify({ description, value }),
+  });
+}
+
+export async function updateGastoFixo(id, data) {
+  return apiFetch(`/api/financeiro/fixed-expenses/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function removeGastoFixo(id) {
+  return apiFetch(`/api/financeiro/fixed-expenses/${id}`, { method: 'DELETE' });
+}
+
 // ========== Planilha Financeira ==========
 
 export async function fetchFinanceiro(yearMonth) {
