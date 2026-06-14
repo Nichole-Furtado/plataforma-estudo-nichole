@@ -540,6 +540,7 @@ function EntrySection({ title, Icon, accent, type, entries, total, placeholder, 
               <EntryRow
                 key={entry.id}
                 entry={entry}
+                type={type}
                 accent={accent}
                 striped={i % 2 === 1}
                 onUpdate={onUpdate}
@@ -553,7 +554,7 @@ function EntrySection({ title, Icon, accent, type, entries, total, placeholder, 
   );
 }
 
-function EntryRow({ entry, accent, striped, onUpdate, onRemove }) {
+function EntryRow({ entry, type, accent, striped, onUpdate, onRemove }) {
   const [editing, setEditing] = useState(false);
   const [desc, setDesc] = useState(entry.description);
   const [val, setVal] = useState(entry.value);
@@ -586,26 +587,61 @@ function EntryRow({ entry, accent, striped, onUpdate, onRemove }) {
       }`}
     >
       {editing ? (
-        <>
-          <input
-            type="text"
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && save()}
-            autoFocus
-            className="flex-1 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all"
-          />
-          <input
-            type="number"
-            step="0.01"
-            value={val}
-            onChange={(e) => setVal(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && save()}
-            className="w-24 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-sm tabular-nums focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all"
-          />
-          <button onClick={save} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--success)] hover:bg-[var(--bg-hover)] transition-colors" title="Salvar"><Check size={16} /></button>
-          <button onClick={cancel} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors" title="Cancelar"><X size={16} /></button>
-        </>
+        <div className="flex flex-col gap-2 flex-1">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && save()}
+              autoFocus
+              className="flex-1 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all"
+            />
+            <input
+              type="number"
+              step="0.01"
+              value={val}
+              onChange={(e) => setVal(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && save()}
+              className="w-24 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-sm tabular-nums focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all"
+            />
+            <button onClick={save} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--success)] hover:bg-[var(--bg-hover)] transition-colors" title="Salvar"><Check size={16} /></button>
+            <button onClick={cancel} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors" title="Cancelar"><X size={16} /></button>
+          </div>
+          {type === 'expense' && (
+            <div className="flex items-center gap-2 pl-1">
+              <CreditCard size={13} style={{ color: 'var(--text-secondary)' }} className="shrink-0" />
+              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Parcelas:</span>
+              <input
+                type="number"
+                min="1"
+                max="99"
+                value={parcelas}
+                onChange={(e) => setParcelas(e.target.value)}
+                className="w-14 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-center tabular-nums focus:outline-none focus:border-[var(--accent)] transition-all"
+              />
+              {parseInt(parcelas) > 1 && (
+                <>
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>· Parcela atual:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={parseInt(parcelas)}
+                    value={parcelaAtual}
+                    onChange={(e) => setParcelaAtual(e.target.value)}
+                    className="w-14 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-center tabular-nums focus:outline-none focus:border-[var(--accent)] transition-all"
+                  />
+                  <span
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+                  >
+                    {parcelaAtual || 1}/{parseInt(parcelas)}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       ) : (
         <>
           {/* Toggle ativo/inativo */}

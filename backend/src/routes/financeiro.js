@@ -25,6 +25,12 @@ function parseValue(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function addMonths(yearMonth, offset) {
+  const [y, m] = yearMonth.split('-').map(Number);
+  const d = new Date(y, m - 1 + offset, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 // ── Rendas Fixas (aparecem em todos os meses) ──────────────────────────────
 
 // GET /api/financeiro/fixed
@@ -100,18 +106,38 @@ router.post('/:yearMonth/entry', async (req, res) => {
   if (!description || !description.trim()) {
     return res.status(400).json({ error: 'Descrição é obrigatória' });
   }
+
+  const totalParcelas = parseInt(parcelas) || 1;
+  const parcelaAtualNum = parseInt(parcelaAtual) || 1;
+  const desc = description.trim();
+  const val = parseValue(value);
+
   const month = getMonth(req.params.yearMonth);
   const entry = {
     id: makeId(),
-    description: description.trim(),
-    value: parseValue(value),
+    description: desc,
+    value: val,
     active: true,
-    ...(parcelas && parseInt(parcelas) > 1 ? {
-      parcelas: parseInt(parcelas),
-      parcelaAtual: parseInt(parcelaAtual) || 1,
-    } : {}),
+    ...(totalParcelas > 1 ? { parcelas: totalParcelas, parcelaAtual: parcelaAtualNum } : {}),
   };
   (type === 'income' ? month.incomes : month.expenses).push(entry);
+
+  // Cria automaticamente as parcelas restantes nos meses seguintes
+  if (type === 'expense' && totalParcelas > 1) {
+    for (let i = parcelaAtualNum + 1; i <= totalParcelas; i++) {
+      const futureYearMonth = addMonths(req.params.yearMonth, i - parcelaAtualNum);
+      const futureMonth = getMonth(futureYearMonth);
+      futureMonth.expenses.push({
+        id: makeId(),
+        description: desc,
+        value: val,
+        active: true,
+        parcelas: totalParcelas,
+        parcelaAtual: i,
+      });
+    }
+  }
+
   await persist('financeiro');
   res.json({ message: 'Lançamento adicionado', entry, data: month });
 });
