@@ -431,7 +431,7 @@ function EntrySection({ title, Icon, accent, type, entries, total, placeholder, 
 
   const submit = () => {
     if (!desc.trim()) return;
-    const extras = isExpense && totalParcelas > 1
+    const extras = totalParcelas > 1
       ? { parcelas: totalParcelas, parcelaAtual: parseInt(parcelaAtual) || 1 }
       : {};
     onAdd(type, desc.trim(), parseFloat(val) || 0, extras);
@@ -490,9 +490,8 @@ function EntrySection({ title, Icon, accent, type, entries, total, placeholder, 
           </button>
         </div>
 
-        {/* Parcelas (só para gastos) */}
-        {isExpense && (
-          <div className="flex items-center gap-2">
+        {/* Parcelas */}
+        <div className="flex items-center gap-2">
             <CreditCard size={14} style={{ color: 'var(--text-secondary)' }} className="shrink-0" />
             <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Parcelas:</span>
             <input
@@ -524,7 +523,6 @@ function EntrySection({ title, Icon, accent, type, entries, total, placeholder, 
               </>
             )}
           </div>
-        )}
       </div>
 
       {/* Entries list */}
@@ -608,8 +606,7 @@ function EntryRow({ entry, type, accent, striped, onUpdate, onRemove }) {
             <button onClick={save} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--success)] hover:bg-[var(--bg-hover)] transition-colors" title="Salvar"><Check size={16} /></button>
             <button onClick={cancel} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors" title="Cancelar"><X size={16} /></button>
           </div>
-          {type === 'expense' && (
-            <div className="flex items-center gap-2 pl-1">
+          <div className="flex items-center gap-2 pl-1">
               <CreditCard size={13} style={{ color: 'var(--text-secondary)' }} className="shrink-0" />
               <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Parcelas:</span>
               <input
@@ -640,7 +637,6 @@ function EntryRow({ entry, type, accent, striped, onUpdate, onRemove }) {
                 </>
               )}
             </div>
-          )}
         </div>
       ) : (
         <>

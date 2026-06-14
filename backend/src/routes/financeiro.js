@@ -123,11 +123,12 @@ router.post('/:yearMonth/entry', async (req, res) => {
   (type === 'income' ? month.incomes : month.expenses).push(entry);
 
   // Cria automaticamente as parcelas restantes nos meses seguintes
-  if (type === 'expense' && totalParcelas > 1) {
+  if (totalParcelas > 1) {
+    const list = type === 'income' ? 'incomes' : 'expenses';
     for (let i = parcelaAtualNum + 1; i <= totalParcelas; i++) {
       const futureYearMonth = addMonths(req.params.yearMonth, i - parcelaAtualNum);
       const futureMonth = getMonth(futureYearMonth);
-      futureMonth.expenses.push({
+      futureMonth[list].push({
         id: makeId(),
         description: desc,
         value: val,
