@@ -51,6 +51,7 @@ git push -u origin main
    ```
    mongodb+srv://USUARIO:SENHA@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority
    ```
+
    Troque `USUARIO` e `SENHA` pelos que você criou. Guarde — vamos usar no passo 3.
 
 ---
@@ -65,14 +66,13 @@ git push -u origin main
    - **Build Command:** `npm install`
    - **Start Command:** `npm start`
    - **Plan:** Free
-4. Em **Environment** (variáveis), adicione:
-   | Key | Value |
-   |-----|-------|
-   | `NODE_ENV` | `production` |
-   | `ENABLE_CODE_EXECUTION` | `false` |
-   | `MONGODB_URI` | a connection string do MongoDB Atlas (passo 2) |
-   | `MONGODB_DB` | `nichole_study` |
-   | `ALLOWED_ORIGINS` | *(deixe por enquanto; preencheremos no passo 5)* |
+4. Em **Environment** (variáveis), adicione:| Key                       | Value                                              |
+   | ------------------------- | -------------------------------------------------- |
+   | `NODE_ENV`              | `production`                                     |
+   | `ENABLE_CODE_EXECUTION` | `false`                                          |
+   | `MONGODB_URI`           | a connection string do MongoDB Atlas (passo 2)     |
+   | `MONGODB_DB`            | `nichole_study`                                  |
+   | `ALLOWED_ORIGINS`       | *(deixe por enquanto; preencheremos no passo 5)* |
 5. Clique em **Create Web Service** e aguarde o build.
 6. Anote a URL gerada, algo como: **`https://nichole-backend.onrender.com`**
 7. Teste no navegador: `https://nichole-backend.onrender.com/api/health` → deve responder `{"status":"ok"}`.
@@ -88,10 +88,9 @@ git push -u origin main
 3. Em **Configure Project**:
    - **Root Directory:** `frontend`  ← clique em *Edit* e selecione a pasta `frontend`
    - Framework: **Next.js** (detectado automaticamente)
-4. Em **Environment Variables**, adicione:
-   | Key | Value |
-   |-----|-------|
-   | `NEXT_PUBLIC_API_URL` | a URL do backend do passo 3 (ex: `https://nichole-backend.onrender.com`) |
+4. Em **Environment Variables**, adicione:| Key                     | Value                                                                     |
+   | ----------------------- | ------------------------------------------------------------------------- |
+   | `NEXT_PUBLIC_API_URL` | a URL do backend do passo 3 (ex:`https://nichole-backend.onrender.com`) |
 5. Clique em **Deploy** e aguarde.
 6. Anote a URL final, algo como: **`https://plataforma-estudo-nichole.vercel.app`**
 
