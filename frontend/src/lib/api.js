@@ -156,6 +156,28 @@ export async function updateLesson(moduleId, lessonId, data) {
   });
 }
 
+// ========== Lembretes ==========
+
+export async function fetchLembretes() {
+  return apiFetch('/api/lembretes');
+}
+
+export async function addLembrete(text) {
+  return apiFetch('/api/lembretes', { method: 'POST', body: JSON.stringify({ text }) });
+}
+
+export async function toggleLembrete(id, completed) {
+  return apiFetch(`/api/lembretes/${id}`, { method: 'PATCH', body: JSON.stringify({ completed }) });
+}
+
+export async function removeLembrete(id) {
+  return apiFetch(`/api/lembretes/${id}`, { method: 'DELETE' });
+}
+
+export async function limparConcluidos() {
+  return apiFetch('/api/lembretes/concluidos/all', { method: 'DELETE' });
+}
+
 // ========== Busca por Palavras-chave ==========
 
 export async function searchByKeyword(q) {

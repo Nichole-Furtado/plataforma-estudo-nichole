@@ -53,7 +53,7 @@ router.post('/:yearMonth/entry', async (req, res) => {
   }
 
   const month = getMonth(req.params.yearMonth);
-  const entry = { id: makeId(), description: description.trim(), value: parseValue(value) };
+  const entry = { id: makeId(), description: description.trim(), value: parseValue(value), active: true };
   (type === 'income' ? month.incomes : month.expenses).push(entry);
   await persist('financeiro');
   res.json({ message: 'Lançamento adicionado', entry, data: month });
@@ -62,7 +62,7 @@ router.post('/:yearMonth/entry', async (req, res) => {
 // PATCH /api/financeiro/:yearMonth/entry/:id — edita um lançamento
 router.patch('/:yearMonth/entry/:id', async (req, res) => {
   const { yearMonth, id } = req.params;
-  const { description, value } = req.body;
+  const { description, value, active } = req.body;
   const month = financeiro()[yearMonth];
   if (!month) return res.status(404).json({ error: 'Mês não encontrado' });
 
@@ -71,6 +71,7 @@ router.patch('/:yearMonth/entry/:id', async (req, res) => {
 
   if (description !== undefined) entry.description = String(description).trim();
   if (value !== undefined) entry.value = parseValue(value);
+  if (active !== undefined) entry.active = Boolean(active);
   await persist('financeiro');
   res.json({ message: 'Lançamento atualizado', entry, data: month });
 });

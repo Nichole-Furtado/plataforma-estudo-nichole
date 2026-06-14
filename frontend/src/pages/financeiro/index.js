@@ -91,8 +91,8 @@ export default function FinanceiroPage() {
     }
   };
 
-  const totalIncome = incomes.reduce((acc, e) => acc + (e.value || 0), 0);
-  const totalExpense = expenses.reduce((acc, e) => acc + (e.value || 0), 0);
+  const totalIncome = incomes.filter(e => e.active !== false).reduce((acc, e) => acc + (e.value || 0), 0);
+  const totalExpense = expenses.filter(e => e.active !== false).reduce((acc, e) => acc + (e.value || 0), 0);
   const balance = totalIncome - totalExpense;
   const spentPct = totalIncome > 0 ? Math.min(100, Math.round((totalExpense / totalIncome) * 100)) : 0;
 
@@ -247,7 +247,9 @@ function EntrySection({ title, Icon, accent, type, entries, total, placeholder, 
             <Icon size={17} strokeWidth={2.2} />
           </span>
           {title}
-          <span className="text-xs font-medium text-[var(--text-secondary)]">({entries.length})</span>
+          <span className="text-xs font-medium text-[var(--text-secondary)]">
+          ({entries.filter(e => e.active !== false).length}/{entries.length})
+        </span>
         </h2>
         <span className="font-bold tabular-nums" style={{ color: accent }}>{brl(total)}</span>
       </div>
@@ -352,9 +354,36 @@ function EntryRow({ entry, accent, striped, onUpdate, onRemove }) {
         </>
       ) : (
         <>
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: accent }} />
-          <span className="flex-1 text-sm truncate" title={entry.description}>{entry.description}</span>
-          <span className="text-sm font-semibold tabular-nums" style={{ color: accent }}>{brl(entry.value)}</span>
+          {/* Toggle ativo/inativo */}
+          <button
+            onClick={() => onUpdate(entry.id, { active: entry.active === false })}
+            title={entry.active === false ? 'Ativar (contar no total)' : 'Desativar (só registrar)'}
+            className="shrink-0 w-4 h-4 rounded-full border-2 transition-all duration-200 hover:scale-110"
+            style={{
+              background: entry.active === false ? 'transparent' : accent,
+              borderColor: entry.active === false ? 'var(--border)' : accent,
+            }}
+          />
+          <span
+            className="flex-1 text-sm truncate transition-all duration-200"
+            title={entry.description}
+            style={{
+              color: entry.active === false ? 'var(--text-secondary)' : 'var(--text-primary)',
+              textDecoration: entry.active === false ? 'line-through' : 'none',
+              opacity: entry.active === false ? 0.6 : 1,
+            }}
+          >
+            {entry.description}
+          </span>
+          <span
+            className="text-sm font-semibold tabular-nums transition-all duration-200"
+            style={{
+              color: entry.active === false ? 'var(--text-secondary)' : accent,
+              opacity: entry.active === false ? 0.5 : 1,
+            }}
+          >
+            {brl(entry.value)}
+          </span>
           <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
             <button
               onClick={() => setEditing(true)}

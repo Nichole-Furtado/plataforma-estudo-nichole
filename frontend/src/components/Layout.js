@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { GraduationCap, Home, Code2, CalendarCheck, Wallet, Settings, Search } from 'lucide-react';
+import { GraduationCap, Home, Code2, CalendarCheck, Wallet, Settings, Search, ListChecks } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/', icon: Home, label: 'Módulos', match: (p) => p === '/' },
   { href: '/ide', icon: Code2, label: 'IDE' },
   { href: '/report', icon: CalendarCheck, label: 'Relatório' },
   { href: '/financeiro', icon: Wallet, label: 'Financeiro' },
+  { href: '/lembretes', icon: ListChecks, label: 'Lembretes' },
   { href: '/admin', icon: Settings, label: 'Gerenciar' },
   { href: '/search', icon: Search, label: 'Buscar' },
 ];

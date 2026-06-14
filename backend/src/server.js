@@ -12,6 +12,7 @@ const financeiroRouter = require('./routes/financeiro');
 const adminRouter = require('./routes/admin');
 const searchRouter = require('./routes/search');
 const authRouter = require('./routes/auth');
+const lembretesRouter = require('./routes/lembretes');
 const setupSocket = require('./socket');
 const { init } = require('./state');
 const { verifyToken } = require('./lib/token');
@@ -56,6 +57,7 @@ app.use('/api/tracker', requireAuth, trackerRouter);
 app.use('/api/financeiro', requireAuth, financeiroRouter);
 app.use('/api/admin', requireAuth, adminRouter);
 app.use('/api/search', requireAuth, searchRouter);
+app.use('/api/lembretes', requireAuth, lembretesRouter);
 
 const PORT = process.env.PORT || 4000;
 

@@ -13,6 +13,7 @@ const state = {
   progress: {},
   tracker: {},
   financeiro: {},
+  lembretes: [],
 };
 
 async function init() {
@@ -30,6 +31,7 @@ async function init() {
   state.progress = await store.load('progress', {});
   state.tracker = await store.load('tracker', {});
   state.financeiro = await store.load('financeiro', {});
+  state.lembretes = await store.load('lembretes', []);
 
   console.log(`✅ Dados carregados (${state.modules.length} módulos)`);
 }
