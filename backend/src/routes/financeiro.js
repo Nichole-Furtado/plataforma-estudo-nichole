@@ -2,11 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { state, persist } = require('../state');
 
-/**
- * Planilha Financeira mensal, persistida via store (MongoDB ou arquivo).
- * Estrutura por mês (ex: "2026-06"):
- *   { incomes: [{ id, description, value }], expenses: [{ id, description, value }] }
- */
 const financeiro = () => state.financeiro;
 
 function getMonth(yearMonth) {
@@ -14,6 +9,11 @@ function getMonth(yearMonth) {
     financeiro()[yearMonth] = { incomes: [], expenses: [] };
   }
   return financeiro()[yearMonth];
+}
+
+function getFixed() {
+  if (!financeiro()._fixed) financeiro()._fixed = [];
+  return financeiro()._fixed;
 }
 
 function makeId() {
@@ -25,13 +25,62 @@ function parseValue(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
-// GET /api/financeiro/:yearMonth — dados do mês
+// ── Rendas Fixas (aparecem em todos os meses) ──────────────────────────────
+
+// GET /api/financeiro/fixed
+router.get('/fixed', (_req, res) => {
+  res.json(getFixed());
+});
+
+// POST /api/financeiro/fixed
+router.post('/fixed', async (req, res) => {
+  const { description, value } = req.body;
+  if (!description || !String(description).trim()) {
+    return res.status(400).json({ error: 'Descrição é obrigatória' });
+  }
+  const entry = {
+    id: makeId(),
+    description: String(description).trim(),
+    value: parseValue(value),
+    active: true,
+  };
+  getFixed().push(entry);
+  await persist('financeiro');
+  res.json({ entry, fixed: getFixed() });
+});
+
+// PATCH /api/financeiro/fixed/:id
+router.patch('/fixed/:id', async (req, res) => {
+  const entry = getFixed().find((e) => e.id === req.params.id);
+  if (!entry) return res.status(404).json({ error: 'Renda fixa não encontrada' });
+  const { description, value, active } = req.body;
+  if (description !== undefined) entry.description = String(description).trim();
+  if (value !== undefined) entry.value = parseValue(value);
+  if (active !== undefined) entry.active = Boolean(active);
+  await persist('financeiro');
+  res.json({ entry, fixed: getFixed() });
+});
+
+// DELETE /api/financeiro/fixed/:id
+router.delete('/fixed/:id', async (req, res) => {
+  const before = getFixed().length;
+  financeiro()._fixed = getFixed().filter((e) => e.id !== req.params.id);
+  if (financeiro()._fixed.length === before) {
+    return res.status(404).json({ error: 'Renda fixa não encontrada' });
+  }
+  await persist('financeiro');
+  res.json({ fixed: getFixed() });
+});
+
+// ── Lançamentos mensais ────────────────────────────────────────────────────
+
+// GET /api/financeiro/:yearMonth
 router.get('/:yearMonth', (req, res) => {
   const data = financeiro()[req.params.yearMonth] || { incomes: [], expenses: [] };
   res.json(data);
 });
 
-// PUT /api/financeiro/:yearMonth — sobrescreve o mês inteiro
+// PUT /api/financeiro/:yearMonth
 router.put('/:yearMonth', async (req, res) => {
   const { incomes, expenses } = req.body;
   financeiro()[req.params.yearMonth] = {
@@ -42,17 +91,15 @@ router.put('/:yearMonth', async (req, res) => {
   res.json({ message: 'Planilha salva', data: financeiro()[req.params.yearMonth] });
 });
 
-// POST /api/financeiro/:yearMonth/entry — adiciona renda ou gasto
+// POST /api/financeiro/:yearMonth/entry
 router.post('/:yearMonth/entry', async (req, res) => {
-  const { type, description, value } = req.body;
+  const { type, description, value, parcelas, parcelaAtual } = req.body;
   if (type !== 'income' && type !== 'expense') {
     return res.status(400).json({ error: 'Tipo deve ser "income" ou "expense"' });
   }
   if (!description || !description.trim()) {
     return res.status(400).json({ error: 'Descrição é obrigatória' });
   }
-
-  const { parcelas, parcelaAtual } = req.body;
   const month = getMonth(req.params.yearMonth);
   const entry = {
     id: makeId(),
@@ -69,10 +116,10 @@ router.post('/:yearMonth/entry', async (req, res) => {
   res.json({ message: 'Lançamento adicionado', entry, data: month });
 });
 
-// PATCH /api/financeiro/:yearMonth/entry/:id — edita um lançamento
+// PATCH /api/financeiro/:yearMonth/entry/:id
 router.patch('/:yearMonth/entry/:id', async (req, res) => {
   const { yearMonth, id } = req.params;
-  const { description, value, active } = req.body;
+  const { description, value, active, parcelas, parcelaAtual } = req.body;
   const month = financeiro()[yearMonth];
   if (!month) return res.status(404).json({ error: 'Mês não encontrado' });
 
@@ -82,13 +129,13 @@ router.patch('/:yearMonth/entry/:id', async (req, res) => {
   if (description !== undefined) entry.description = String(description).trim();
   if (value !== undefined) entry.value = parseValue(value);
   if (active !== undefined) entry.active = Boolean(active);
-  if (parcelas !== undefined) entry.parcelas = parseInt(parcelas) || undefined;
+  if (parcelas !== undefined) entry.parcelas = parseInt(parcelas) > 1 ? parseInt(parcelas) : undefined;
   if (parcelaAtual !== undefined) entry.parcelaAtual = parseInt(parcelaAtual) || 1;
   await persist('financeiro');
   res.json({ message: 'Lançamento atualizado', entry, data: month });
 });
 
-// DELETE /api/financeiro/:yearMonth/entry/:id — remove um lançamento
+// DELETE /api/financeiro/:yearMonth/entry/:id
 router.delete('/:yearMonth/entry/:id', async (req, res) => {
   const { yearMonth, id } = req.params;
   const month = financeiro()[yearMonth];

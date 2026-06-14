@@ -1,13 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Scale,
-  Plus, Pencil, Trash2, Check, X, Inbox, CreditCard,
+  Plus, Pencil, Trash2, Check, X, Inbox, CreditCard, Pin,
 } from 'lucide-react';
 import {
   fetchFinanceiro,
   addFinanceiroEntry,
   updateFinanceiroEntry,
   removeFinanceiroEntry,
+  fetchRendasFixas,
+  addRendaFixa,
+  updateRendaFixa,
+  removeRendaFixa,
 } from '@/lib/api';
 
 function getMonthName(month) {
@@ -29,6 +33,7 @@ export default function FinanceiroPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [incomes, setIncomes] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [fixedIncomes, setFixedIncomes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
@@ -36,9 +41,13 @@ export default function FinanceiroPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchFinanceiro(yearMonth);
+      const [data, fixed] = await Promise.all([
+        fetchFinanceiro(yearMonth),
+        fetchRendasFixas(),
+      ]);
       setIncomes(data.incomes || []);
       setExpenses(data.expenses || []);
+      setFixedIncomes(fixed || []);
     } catch (err) {
       console.error('Erro ao carregar financeiro:', err);
     } finally {
@@ -91,7 +100,8 @@ export default function FinanceiroPage() {
     }
   };
 
-  const totalIncome = incomes.filter(e => e.active !== false).reduce((acc, e) => acc + (e.value || 0), 0);
+  const totalFixed = fixedIncomes.filter(e => e.active !== false).reduce((acc, e) => acc + (e.value || 0), 0);
+  const totalIncome = totalFixed + incomes.filter(e => e.active !== false).reduce((acc, e) => acc + (e.value || 0), 0);
   const totalExpense = expenses.filter(e => e.active !== false).reduce((acc, e) => acc + (e.value || 0), 0);
   const balance = totalIncome - totalExpense;
   const spentPct = totalIncome > 0 ? Math.min(100, Math.round((totalExpense / totalIncome) * 100)) : 0;
@@ -163,6 +173,24 @@ export default function FinanceiroPage() {
         </div>
       )}
 
+      {/* Rendas Fixas */}
+      <FixedIncomesSection
+        items={fixedIncomes}
+        total={totalFixed}
+        onAdd={async (desc, val) => {
+          const res = await addRendaFixa(desc, val);
+          setFixedIncomes(res.fixed);
+        }}
+        onUpdate={async (id, patch) => {
+          const res = await updateRendaFixa(id, patch);
+          setFixedIncomes(res.fixed);
+        }}
+        onRemove={async (id) => {
+          const res = await removeRendaFixa(id);
+          setFixedIncomes(res.fixed);
+        }}
+      />
+
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <span className="w-7 h-7 rounded-full border-2 border-[var(--border)] border-t-[var(--accent)] animate-spin" />
@@ -198,6 +226,174 @@ export default function FinanceiroPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function FixedIncomesSection({ items, total, onAdd, onUpdate, onRemove }) {
+  const [desc, setDesc] = useState('');
+  const [val, setVal] = useState('');
+  const [open, setOpen] = useState(true);
+
+  const submit = async () => {
+    if (!desc.trim()) return;
+    try {
+      await onAdd(desc.trim(), parseFloat(val) || 0);
+      setDesc('');
+      setVal('');
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <div className="card-surface rounded-xl overflow-hidden mb-6 fade-in-up" style={{ animationDelay: '160ms' }}>
+      {/* Header */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full px-5 py-4 flex items-center justify-between border-b border-[var(--border-soft)] hover:bg-[var(--bg-hover)]/40 transition-colors"
+      >
+        <h2 className="text-base font-semibold flex items-center gap-2.5">
+          <span className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: tint('var(--success)', 14), color: 'var(--success)' }}>
+            <Pin size={15} strokeWidth={2.2} />
+          </span>
+          Rendas Fixas
+          <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+            ({items.filter(e => e.active !== false).length}/{items.length}) · aparece todo mês
+          </span>
+        </h2>
+        <div className="flex items-center gap-3">
+          <span className="font-bold tabular-nums" style={{ color: 'var(--success)' }}>{brl(total)}</span>
+          <ChevronRight size={16} style={{ color: 'var(--text-secondary)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+        </div>
+      </button>
+
+      {open && (
+        <>
+          {/* Add form */}
+          <div className="px-5 py-3 border-b border-[var(--border-soft)] flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={desc}
+              onChange={e => setDesc(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submit()}
+              placeholder="Ex: Salário, Freelance mensal, Aluguel recebido..."
+              className="flex-1 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all"
+              style={{ color: 'var(--text-primary)' }}
+            />
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={val}
+              onChange={e => setVal(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submit()}
+              placeholder="0,00"
+              className="w-full sm:w-28 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-4 py-2 text-sm tabular-nums focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all"
+              style={{ color: 'var(--text-primary)' }}
+            />
+            <button
+              onClick={submit}
+              disabled={!desc.trim()}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+              style={{ background: 'var(--success)' }}
+            >
+              <Plus size={15} strokeWidth={2.4} /> Adicionar
+            </button>
+          </div>
+
+          {/* Lista */}
+          {items.length === 0 ? (
+            <div className="text-center py-8 px-5">
+              <Pin size={22} className="mx-auto mb-2 opacity-30" style={{ color: 'var(--text-secondary)' }} />
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                Nenhuma renda fixa cadastrada. Adicione acima.
+              </p>
+            </div>
+          ) : (
+            <ul>
+              {items.map((entry, i) => (
+                <FixedEntryRow
+                  key={entry.id}
+                  entry={entry}
+                  striped={i % 2 === 1}
+                  onUpdate={onUpdate}
+                  onRemove={onRemove}
+                />
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function FixedEntryRow({ entry, striped, onUpdate, onRemove }) {
+  const [editing, setEditing] = useState(false);
+  const [desc, setDesc] = useState(entry.description);
+  const [val, setVal] = useState(entry.value);
+  const accent = 'var(--success)';
+
+  const save = () => {
+    onUpdate(entry.id, { description: desc, value: parseFloat(val) || 0 });
+    setEditing(false);
+  };
+  const cancel = () => { setDesc(entry.description); setVal(entry.value); setEditing(false); };
+
+  return (
+    <li
+      className={`group flex items-center gap-2 px-5 py-3 border-b border-[var(--border-soft)] last:border-b-0 transition-colors hover:bg-[var(--bg-hover)]/50 ${striped ? 'bg-[var(--bg-subtle)]/60' : ''}`}
+    >
+      {editing ? (
+        <>
+          <input type="text" value={desc} onChange={e => setDesc(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && save()} autoFocus
+            className="flex-1 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all"
+          />
+          <input type="number" step="0.01" value={val} onChange={e => setVal(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && save()}
+            className="w-24 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-sm tabular-nums focus:outline-none focus:border-[var(--accent)] transition-all"
+          />
+          <button onClick={save} className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors" style={{ color: 'var(--success)' }} title="Salvar"><Check size={16} /></button>
+          <button onClick={cancel} className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors" style={{ color: 'var(--text-secondary)' }} title="Cancelar"><X size={16} /></button>
+        </>
+      ) : (
+        <>
+          <button
+            onClick={() => onUpdate(entry.id, { active: entry.active === false })}
+            title={entry.active === false ? 'Ativar' : 'Desativar temporariamente'}
+            className="shrink-0 w-4 h-4 rounded-full border-2 transition-all hover:scale-110"
+            style={{ background: entry.active === false ? 'transparent' : accent, borderColor: entry.active === false ? 'var(--border)' : accent }}
+          />
+          <Pin size={12} className="shrink-0 opacity-40" style={{ color: accent }} />
+          <span className="flex-1 text-sm truncate"
+            style={{ color: entry.active === false ? 'var(--text-secondary)' : 'var(--text-primary)',
+              textDecoration: entry.active === false ? 'line-through' : 'none',
+              opacity: entry.active === false ? 0.6 : 1 }}>
+            {entry.description}
+          </span>
+          <span className="text-sm font-semibold tabular-nums"
+            style={{ color: entry.active === false ? 'var(--text-secondary)' : accent, opacity: entry.active === false ? 0.5 : 1 }}>
+            {brl(entry.value)}
+          </span>
+          <div className="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+            <button onClick={() => setEditing(true)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+              style={{ color: 'var(--text-secondary)' }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+              title="Editar"><Pencil size={15} /></button>
+            <button onClick={() => onRemove(entry.id)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+              style={{ color: 'var(--text-secondary)' }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--error)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+              title="Remover"><Trash2 size={15} /></button>
+          </div>
+        </>
+      )}
+    </li>
   );
 }
 
