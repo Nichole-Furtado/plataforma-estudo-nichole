@@ -13,6 +13,7 @@ const adminRouter = require('./routes/admin');
 const searchRouter = require('./routes/search');
 const authRouter = require('./routes/auth');
 const lembretesRouter = require('./routes/lembretes');
+const checklistRouter = require('./routes/checklist');
 const setupSocket = require('./socket');
 const { init } = require('./state');
 const { verifyToken } = require('./lib/token');
@@ -58,6 +59,7 @@ app.use('/api/financeiro', requireAuth, financeiroRouter);
 app.use('/api/admin', requireAuth, adminRouter);
 app.use('/api/search', requireAuth, searchRouter);
 app.use('/api/lembretes', requireAuth, lembretesRouter);
+app.use('/api/checklist', requireAuth, checklistRouter);
 
 const PORT = process.env.PORT || 4000;
 

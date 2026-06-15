@@ -226,6 +226,30 @@ export async function limparConcluidos() {
   return apiFetch('/api/lembretes/concluidos/all', { method: 'DELETE' });
 }
 
+// ========== Checklist Semanal ==========
+
+export async function fetchHabits() {
+  return apiFetch('/api/checklist/habits');
+}
+export async function addHabit(name) {
+  return apiFetch('/api/checklist/habits', { method: 'POST', body: JSON.stringify({ name }) });
+}
+export async function updateHabit(id, name) {
+  return apiFetch(`/api/checklist/habits/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) });
+}
+export async function removeHabit(id) {
+  return apiFetch(`/api/checklist/habits/${id}`, { method: 'DELETE' });
+}
+export async function fetchWeek(weekKey) {
+  return apiFetch(`/api/checklist/week/${weekKey}`);
+}
+export async function toggleDay(weekKey, habitId, day) {
+  return apiFetch(`/api/checklist/week/${weekKey}/toggle`, {
+    method: 'PATCH',
+    body: JSON.stringify({ habitId, day }),
+  });
+}
+
 // ========== Busca por Palavras-chave ==========
 
 export async function searchByKeyword(q) {
