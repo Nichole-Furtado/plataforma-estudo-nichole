@@ -20,6 +20,22 @@ const brl = (n) =>
 
 const tint = (color, pct) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 
+// Avança (ou retrocede) meses a partir de "YYYY-MM".
+const addMonths = (yearMonth, offset) => {
+  const [y, m] = yearMonth.split('-').map(Number);
+  const d = new Date(y, m - 1 + offset, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+// "2026-03" → "Mar/26"
+const labelMonth = (yearMonth) => {
+  const [y, m] = yearMonth.split('-').map(Number);
+  return `${MONTH_SHORT[m - 1]}/${String(y).slice(2)}`;
+};
+
+const sumActive = (list) =>
+  (list || []).filter((e) => e.active !== false).reduce((s, e) => s + (e.value || 0), 0);
+
 // ── Month Picker ───────────────────────────────────────────────────────────────
 
 function MonthPicker({ month, year, onChange }) {
@@ -127,6 +143,11 @@ export default function FinanceiroPage() {
   const [fixedExpenses, setFixedExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Projeção: deste mês em diante (pega as parcelas que caem nos meses seguintes)
+  const [horizon, setHorizon] = useState(12);
+  const [future, setFuture] = useState([]);
+  const [futureLoading, setFutureLoading] = useState(true);
+
   const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
 
   const loadData = useCallback(async () => {
@@ -150,9 +171,34 @@ export default function FinanceiroPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Busca os meses do horizonte em paralelo. Guarda só os lançamentos avulsos:
+  // os fixos entram no cálculo na hora de exibir, para refletir edições na hora.
+  const loadFuture = useCallback(async () => {
+    setFutureLoading(true);
+    try {
+      const months = Array.from({ length: horizon }, (_, i) => addMonths(yearMonth, i));
+      const results = await Promise.all(
+        months.map((ym) => fetchFinanceiro(ym).catch(() => ({ incomes: [], expenses: [] })))
+      );
+      setFuture(
+        months.map((ym, i) => ({
+          yearMonth: ym,
+          income: sumActive(results[i].incomes),
+          expense: sumActive(results[i].expenses),
+          parcelas: (results[i].expenses || []).filter((e) => (e.parcelas || 1) > 1).length,
+        }))
+      );
+    } finally {
+      setFutureLoading(false);
+    }
+  }, [yearMonth, horizon]);
+
+  useEffect(() => { loadFuture(); }, [loadFuture]);
+
   const applyData = (data) => {
     setIncomes(data.incomes || []);
     setExpenses(data.expenses || []);
+    loadFuture();
   };
 
   const handleAdd = async (type, description, value, extras = {}) => {
@@ -233,6 +279,17 @@ export default function FinanceiroPage() {
         </div>
       )}
 
+      {/* Projeção: deste mês em diante */}
+      <ProjectionPanel
+        months={future}
+        loading={futureLoading}
+        fixedIncome={totalFixed}
+        fixedExpense={totalFixedExp}
+        horizon={horizon}
+        onHorizonChange={setHorizon}
+        delay={190}
+      />
+
       {/* Fixos lado a lado */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <FixedSection
@@ -274,7 +331,9 @@ export default function FinanceiroPage() {
             accent="var(--success)"
             type="income"
             entries={incomes}
-            total={incomes.filter(e => e.active !== false).reduce((s, e) => s + (e.value || 0), 0)}
+            total={sumActive(incomes)}
+            fixedTotal={totalFixed}
+            fixedLabel="Rendas fixas"
             placeholder="Ex: Bônus, Freelance, Poupança..."
             onAdd={handleAdd}
             onUpdate={handleUpdate}
@@ -287,7 +346,9 @@ export default function FinanceiroPage() {
             accent="var(--error)"
             type="expense"
             entries={expenses}
-            total={expenses.filter(e => e.active !== false).reduce((s, e) => s + (e.value || 0), 0)}
+            total={sumActive(expenses)}
+            fixedTotal={totalFixedExp}
+            fixedLabel="Gastos fixos"
             placeholder="Ex: Mercado, Gasolina, Lazer..."
             onAdd={handleAdd}
             onUpdate={handleUpdate}
@@ -444,6 +505,173 @@ function FixedEntryRow({ entry, color, striped, onUpdate, onRemove }) {
   );
 }
 
+// ── Projeção (deste mês em diante) ─────────────────────────────────────────────
+
+const HORIZONS = [6, 12, 24];
+
+function ProjectionPanel({ months, loading, fixedIncome, fixedExpense, horizon, onHorizonChange, delay = 0 }) {
+  const [open, setOpen] = useState(true);
+
+  // Os fixos se repetem todo mês, então entram em cada linha da projeção.
+  const rows = months.map((m) => {
+    const income = m.income + fixedIncome;
+    const expense = m.expense + fixedExpense;
+    return { ...m, income, expense, balance: income - expense };
+  });
+
+  const totalExpense = rows.reduce((s, r) => s + r.expense, 0);
+  const totalIncome = rows.reduce((s, r) => s + r.income, 0);
+  const balance = totalIncome - totalExpense;
+  const maxExpense = rows.reduce((max, r) => Math.max(max, r.expense), 0);
+
+  return (
+    <div className="card-surface rounded-xl overflow-hidden mb-6 fade-in-up" style={{ animationDelay: `${delay}ms` }}>
+      <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-soft)]">
+        <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2.5 text-base font-semibold">
+          <span className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: tint('var(--accent)', 14), color: 'var(--accent)' }}>
+            <CalendarDays size={16} strokeWidth={2.2} />
+          </span>
+          Deste mês em diante
+          <ChevronRight size={16} style={{
+            color: 'var(--text-secondary)',
+            transform: open ? 'rotate(90deg)' : 'none',
+            transition: 'transform .2s',
+          }} />
+        </button>
+        <div className="flex items-center gap-1">
+          {HORIZONS.map((h) => (
+            <button
+              key={h}
+              onClick={() => onHorizonChange(h)}
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors"
+              style={h === horizon
+                ? { background: 'var(--accent)', color: '#fff' }
+                : { background: 'var(--bg-subtle)', color: 'var(--text-secondary)' }}
+            >
+              {h} meses
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {open && (
+        loading ? (
+          <div className="flex items-center justify-center py-12">
+            <span className="w-6 h-6 rounded-full border-2 border-[var(--border)] border-t-[var(--accent)] animate-spin" />
+          </div>
+        ) : (
+          <>
+            {/* Totais do período */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border-soft)]">
+              <div className="px-5 py-4">
+                <p className="text-[11px] uppercase tracking-wider text-[var(--text-secondary)] mb-1">
+                  Receitas previstas
+                </p>
+                <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--success)' }}>{brl(totalIncome)}</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[11px] uppercase tracking-wider text-[var(--text-secondary)] mb-1">
+                  Despesas totais
+                </p>
+                <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--error)' }}>{brl(totalExpense)}</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[11px] uppercase tracking-wider text-[var(--text-secondary)] mb-1">
+                  Saldo previsto
+                </p>
+                <p className="text-xl font-bold tabular-nums"
+                  style={{ color: balance >= 0 ? 'var(--success)' : 'var(--error)' }}>
+                  {brl(balance)}
+                </p>
+              </div>
+            </div>
+
+            <p className="px-5 pb-1 pt-3 text-xs text-[var(--text-secondary)]">
+              Soma de {horizon} meses a partir de {labelMonth(rows[0]?.yearMonth || '')}, já incluindo as parcelas
+              que caem nos próximos meses e os lançamentos fixos repetidos a cada mês.
+            </p>
+
+            {/* Mês a mês */}
+            <div className="px-2 pb-3">
+              {/* Cabeçalho das colunas */}
+              <div className="flex items-center gap-3 px-3 pb-1.5 text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">
+                <span className="w-16 shrink-0">Mês</span>
+                <span className="flex-1" />
+                <span className="w-24 shrink-0 text-right hidden sm:block">Receita</span>
+                <span className="w-24 shrink-0 text-right">Despesa</span>
+                <span className="w-24 shrink-0 text-right hidden sm:block">Saldo</span>
+              </div>
+
+              <ul>
+                {rows.map((r, i) => (
+                  <li key={r.yearMonth}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]/50 ${i === 0 ? 'bg-[var(--accent-soft)]/40' : ''}`}>
+                    <span className="w-16 shrink-0 text-xs font-semibold tabular-nums"
+                      style={{ color: i === 0 ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                      {labelMonth(r.yearMonth)}
+                    </span>
+
+                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                      <div className="flex-1 h-2 rounded-full bg-[var(--bg-secondary)] overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: maxExpense > 0 ? `${(r.expense / maxExpense) * 100}%` : '0%',
+                            background: 'var(--error)',
+                          }} />
+                      </div>
+                      {r.parcelas > 0 && (
+                        <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1"
+                          style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+                          title={`${r.parcelas} gasto(s) parcelado(s) neste mês`}>
+                          <CreditCard size={9} />{r.parcelas}
+                        </span>
+                      )}
+                    </div>
+
+                    <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums hidden sm:block"
+                      style={{ color: 'var(--success)' }}>
+                      {brl(r.income)}
+                    </span>
+                    <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums"
+                      style={{ color: 'var(--error)' }}>
+                      {brl(r.expense)}
+                    </span>
+                    <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums hidden sm:block"
+                      style={{ color: r.balance >= 0 ? 'var(--success)' : 'var(--error)' }}>
+                      {brl(r.balance)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Totais do período */}
+              <div className="flex items-center gap-3 px-3 pt-2.5 mt-1.5 border-t border-[var(--border-soft)]">
+                <span className="w-16 shrink-0 text-xs font-bold">Total</span>
+                <span className="flex-1 text-xs text-[var(--text-secondary)] hidden sm:block">
+                  {horizon} meses
+                </span>
+                <span className="w-24 shrink-0 text-right text-sm font-bold tabular-nums hidden sm:block"
+                  style={{ color: 'var(--success)' }}>
+                  {brl(totalIncome)}
+                </span>
+                <span className="w-24 shrink-0 text-right text-sm font-bold tabular-nums"
+                  style={{ color: 'var(--error)' }}>
+                  {brl(totalExpense)}
+                </span>
+                <span className="w-24 shrink-0 text-right text-sm font-bold tabular-nums hidden sm:block"
+                  style={{ color: balance >= 0 ? 'var(--success)' : 'var(--error)' }}>
+                  {brl(balance)}
+                </span>
+              </div>
+            </div>
+          </>
+        )
+      )}
+    </div>
+  );
+}
+
 // ── Summary Card ───────────────────────────────────────────────────────────────
 
 function SummaryCard({ label, value, Icon, color, delay = 0 }) {
@@ -465,13 +693,25 @@ function SummaryCard({ label, value, Icon, color, delay = 0 }) {
 
 // ── Entry Section (lançamentos mensais) ────────────────────────────────────────
 
-function EntrySection({ title, Icon, accent, type, entries, total, placeholder, onAdd, onUpdate, onRemove, delay = 0 }) {
+function EntrySection({ title, Icon, accent, type, entries, total, fixedTotal = 0, fixedLabel = 'Fixos', placeholder, onAdd, onUpdate, onRemove, delay = 0 }) {
   const [desc, setDesc] = useState('');
   const [val, setVal] = useState('');
   const [parcelas, setParcelas] = useState('');
   const [parcelaAtual, setParcelaAtual] = useState('1');
 
   const totalParcelas = parseInt(parcelas) || 1;
+
+  // Resumo do mês: avulsos + fixos, média, maior lançamento e quanto é parcelado.
+  const activeEntries = entries.filter((e) => e.active !== false);
+  const grandTotal = total + fixedTotal;
+  const average = activeEntries.length ? total / activeEntries.length : 0;
+  const biggest = activeEntries.reduce(
+    (max, e) => ((e.value || 0) > (max?.value || 0) ? e : max),
+    null
+  );
+  const parceladoTotal = activeEntries
+    .filter((e) => (e.parcelas || 1) > 1)
+    .reduce((s, e) => s + (e.value || 0), 0);
 
   const submit = () => {
     if (!desc.trim()) return;
@@ -558,6 +798,43 @@ function EntrySection({ title, Icon, accent, type, entries, total, placeholder, 
                 striped={i % 2 === 1} onUpdate={onUpdate} onRemove={onRemove} />
             ))}
           </ul>
+        )}
+      </div>
+
+      {/* Resumo do mês */}
+      <div className="px-5 py-4 border-t border-[var(--border-soft)] bg-[var(--bg-subtle)]/40">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-[var(--text-secondary)]">Avulsos do mês</span>
+          <span className="tabular-nums font-medium">{brl(total)}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm mt-1.5">
+          <span className="text-[var(--text-secondary)] flex items-center gap-1.5">
+            <Pin size={11} className="opacity-50" /> {fixedLabel}
+          </span>
+          <span className="tabular-nums font-medium">{brl(fixedTotal)}</span>
+        </div>
+        <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-[var(--border-soft)]">
+          <span className="text-sm font-semibold">Total do mês</span>
+          <span className="text-lg font-bold tabular-nums" style={{ color: accent }}>{brl(grandTotal)}</span>
+        </div>
+
+        {activeEntries.length > 0 && (
+          <div className="grid grid-cols-3 gap-2 mt-3.5 pt-3.5 border-t border-[var(--border-soft)]">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] mb-0.5">Média</p>
+              <p className="text-sm font-semibold tabular-nums">{brl(average)}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] mb-0.5">Maior</p>
+              <p className="text-sm font-semibold tabular-nums truncate" title={biggest ? biggest.description : ''}>
+                {biggest ? brl(biggest.value) : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] mb-0.5">Parcelado</p>
+              <p className="text-sm font-semibold tabular-nums">{brl(parceladoTotal)}</p>
+            </div>
+          </div>
         )}
       </div>
     </div>
