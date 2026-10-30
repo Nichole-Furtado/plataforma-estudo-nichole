@@ -521,16 +521,29 @@ function ProjectionPanel({ months, loading, fixedIncome, fixedExpense, horizon, 
   const trimmed = months.length - visible.length;
 
   // Os fixos se repetem todo mês, então entram em cada linha da projeção.
+  // incomeVar / expenseVar = só os lançamentos avulsos daquele mês.
   const rows = visible.map((m) => {
     const income = m.income + fixedIncome;
     const expense = m.expense + fixedExpense;
-    return { ...m, income, expense, balance: income - expense };
+    return {
+      ...m,
+      incomeVar: m.income,
+      expenseVar: m.expense,
+      income,
+      expense,
+      balance: income - expense,
+    };
   });
 
   const totalExpense = rows.reduce((s, r) => s + r.expense, 0);
   const totalIncome = rows.reduce((s, r) => s + r.income, 0);
   const balance = totalIncome - totalExpense;
   const maxExpense = rows.reduce((max, r) => Math.max(max, r.expense), 0);
+
+  const totalIncomeFixed = fixedIncome * rows.length;
+  const totalIncomeVar = rows.reduce((s, r) => s + r.incomeVar, 0);
+  const totalExpenseFixed = fixedExpense * rows.length;
+  const totalExpenseVar = rows.reduce((s, r) => s + r.expenseVar, 0);
 
   return (
     <div className="card-surface rounded-xl overflow-hidden mb-6 fade-in-up" style={{ animationDelay: `${delay}ms` }}>
@@ -577,12 +590,32 @@ function ProjectionPanel({ months, loading, fixedIncome, fixedExpense, horizon, 
                   Receitas previstas
                 </p>
                 <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--success)' }}>{brl(totalIncome)}</p>
+                <div className="mt-2 space-y-0.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[var(--text-secondary)]">Rendas fixas</span>
+                    <span className="tabular-nums">{brl(totalIncomeFixed)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[var(--text-secondary)]">Rendas avulsas</span>
+                    <span className="tabular-nums">{brl(totalIncomeVar)}</span>
+                  </div>
+                </div>
               </div>
               <div className="px-5 py-4">
                 <p className="text-[11px] uppercase tracking-wider text-[var(--text-secondary)] mb-1">
                   Despesas totais
                 </p>
                 <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--error)' }}>{brl(totalExpense)}</p>
+                <div className="mt-2 space-y-0.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[var(--text-secondary)]">Gastos fixos</span>
+                    <span className="tabular-nums">{brl(totalExpenseFixed)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[var(--text-secondary)]">Gastos avulsos</span>
+                    <span className="tabular-nums">{brl(totalExpenseVar)}</span>
+                  </div>
+                </div>
               </div>
               <div className="px-5 py-4">
                 <p className="text-[11px] uppercase tracking-wider text-[var(--text-secondary)] mb-1">
@@ -614,24 +647,28 @@ function ProjectionPanel({ months, loading, fixedIncome, fixedExpense, horizon, 
             {/* Mês a mês */}
             <div className="px-2 pb-3">
               {/* Cabeçalho das colunas */}
-              <div className="flex items-center gap-3 px-3 pb-1.5 text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">
-                <span className="w-16 shrink-0">Mês</span>
-                <span className="flex-1" />
-                <span className="w-24 shrink-0 text-right hidden sm:block">Receita</span>
-                <span className="w-24 shrink-0 text-right">Despesa</span>
-                <span className="w-24 shrink-0 text-right hidden sm:block">Saldo</span>
+              <div className="flex items-center gap-2 px-3 pb-1.5 text-[10px] uppercase tracking-wider">
+                <span className="w-14 shrink-0 text-[var(--text-secondary)]">Mês</span>
+                <span className="flex-1 hidden xl:block" />
+                <span className="w-[86px] shrink-0 text-right hidden lg:block" style={{ color: 'var(--success)' }}>Renda fixa</span>
+                <span className="w-[86px] shrink-0 text-right hidden lg:block" style={{ color: 'var(--success)' }}>Rendas</span>
+                <span className="w-[92px] shrink-0 text-right hidden sm:block font-semibold" style={{ color: 'var(--success)' }}>Receita</span>
+                <span className="w-[86px] shrink-0 text-right hidden lg:block" style={{ color: 'var(--error)' }}>Gasto fixo</span>
+                <span className="w-[86px] shrink-0 text-right hidden lg:block" style={{ color: 'var(--error)' }}>Gastos</span>
+                <span className="w-[92px] shrink-0 text-right font-semibold" style={{ color: 'var(--error)' }}>Despesa</span>
+                <span className="w-[92px] shrink-0 text-right hidden sm:block text-[var(--text-secondary)]">Saldo</span>
               </div>
 
               <ul>
                 {rows.map((r, i) => (
                   <li key={r.yearMonth}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]/50 ${i === 0 ? 'bg-[var(--accent-soft)]/40' : ''}`}>
-                    <span className="w-16 shrink-0 text-xs font-semibold tabular-nums"
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]/50 ${i === 0 ? 'bg-[var(--accent-soft)]/40' : ''}`}>
+                    <span className="w-14 shrink-0 text-xs font-semibold tabular-nums"
                       style={{ color: i === 0 ? 'var(--accent)' : 'var(--text-secondary)' }}>
                       {labelMonth(r.yearMonth)}
                     </span>
 
-                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                    <div className="flex-1 hidden xl:flex items-center gap-2 min-w-0">
                       <div className="flex-1 h-2 rounded-full bg-[var(--bg-secondary)] overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-500"
                           style={{
@@ -648,15 +685,27 @@ function ProjectionPanel({ months, loading, fixedIncome, fixedExpense, horizon, 
                       )}
                     </div>
 
-                    <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums hidden sm:block"
+                    <span className="w-[86px] shrink-0 text-right text-xs tabular-nums hidden lg:block text-[var(--text-secondary)]">
+                      {brl(fixedIncome)}
+                    </span>
+                    <span className="w-[86px] shrink-0 text-right text-xs tabular-nums hidden lg:block text-[var(--text-secondary)]">
+                      {brl(r.incomeVar)}
+                    </span>
+                    <span className="w-[92px] shrink-0 text-right text-sm font-semibold tabular-nums hidden sm:block"
                       style={{ color: 'var(--success)' }}>
                       {brl(r.income)}
                     </span>
-                    <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums"
+                    <span className="w-[86px] shrink-0 text-right text-xs tabular-nums hidden lg:block text-[var(--text-secondary)]">
+                      {brl(fixedExpense)}
+                    </span>
+                    <span className="w-[86px] shrink-0 text-right text-xs tabular-nums hidden lg:block text-[var(--text-secondary)]">
+                      {brl(r.expenseVar)}
+                    </span>
+                    <span className="w-[92px] shrink-0 text-right text-sm font-semibold tabular-nums"
                       style={{ color: 'var(--error)' }}>
                       {brl(r.expense)}
                     </span>
-                    <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums hidden sm:block"
+                    <span className="w-[92px] shrink-0 text-right text-sm font-semibold tabular-nums hidden sm:block"
                       style={{ color: r.balance >= 0 ? 'var(--success)' : 'var(--error)' }}>
                       {brl(r.balance)}
                     </span>
@@ -665,20 +714,32 @@ function ProjectionPanel({ months, loading, fixedIncome, fixedExpense, horizon, 
               </ul>
 
               {/* Totais do período */}
-              <div className="flex items-center gap-3 px-3 pt-2.5 mt-1.5 border-t border-[var(--border-soft)]">
-                <span className="w-16 shrink-0 text-xs font-bold">Total</span>
-                <span className="flex-1 text-xs text-[var(--text-secondary)] hidden sm:block">
+              <div className="flex items-center gap-2 px-3 pt-2.5 mt-1.5 border-t border-[var(--border-soft)]">
+                <span className="w-14 shrink-0 text-xs font-bold">Total</span>
+                <span className="flex-1 text-xs text-[var(--text-secondary)] hidden xl:block">
                   {rows.length} {rows.length === 1 ? 'mês' : 'meses'}
                 </span>
-                <span className="w-24 shrink-0 text-right text-sm font-bold tabular-nums hidden sm:block"
+                <span className="w-[86px] shrink-0 text-right text-xs font-semibold tabular-nums hidden lg:block text-[var(--text-secondary)]">
+                  {brl(totalIncomeFixed)}
+                </span>
+                <span className="w-[86px] shrink-0 text-right text-xs font-semibold tabular-nums hidden lg:block text-[var(--text-secondary)]">
+                  {brl(totalIncomeVar)}
+                </span>
+                <span className="w-[92px] shrink-0 text-right text-sm font-bold tabular-nums hidden sm:block"
                   style={{ color: 'var(--success)' }}>
                   {brl(totalIncome)}
                 </span>
-                <span className="w-24 shrink-0 text-right text-sm font-bold tabular-nums"
+                <span className="w-[86px] shrink-0 text-right text-xs font-semibold tabular-nums hidden lg:block text-[var(--text-secondary)]">
+                  {brl(totalExpenseFixed)}
+                </span>
+                <span className="w-[86px] shrink-0 text-right text-xs font-semibold tabular-nums hidden lg:block text-[var(--text-secondary)]">
+                  {brl(totalExpenseVar)}
+                </span>
+                <span className="w-[92px] shrink-0 text-right text-sm font-bold tabular-nums"
                   style={{ color: 'var(--error)' }}>
                   {brl(totalExpense)}
                 </span>
-                <span className="w-24 shrink-0 text-right text-sm font-bold tabular-nums hidden sm:block"
+                <span className="w-[92px] shrink-0 text-right text-sm font-bold tabular-nums hidden sm:block"
                   style={{ color: balance >= 0 ? 'var(--success)' : 'var(--error)' }}>
                   {brl(balance)}
                 </span>
