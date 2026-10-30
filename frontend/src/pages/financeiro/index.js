@@ -186,6 +186,8 @@ export default function FinanceiroPage() {
           income: sumActive(results[i].incomes),
           expense: sumActive(results[i].expenses),
           parcelas: (results[i].expenses || []).filter((e) => (e.parcelas || 1) > 1).length,
+          // Quantos lançamentos avulsos o mês tem (sem contar os fixos).
+          entries: (results[i].incomes || []).length + (results[i].expenses || []).length,
         }))
       );
     } finally {
@@ -512,8 +514,14 @@ const HORIZONS = [6, 12, 24];
 function ProjectionPanel({ months, loading, fixedIncome, fixedExpense, horizon, onHorizonChange, delay = 0 }) {
   const [open, setOpen] = useState(true);
 
+  // Corta nos meses do fim que não têm nenhum lançamento — sobraria só o valor
+  // dos fixos repetido para sempre, o que não diz nada.
+  const lastWithEntries = months.reduce((last, m, i) => (m.entries > 0 ? i : last), -1);
+  const visible = months.slice(0, Math.max(lastWithEntries + 1, 1));
+  const trimmed = months.length - visible.length;
+
   // Os fixos se repetem todo mês, então entram em cada linha da projeção.
-  const rows = months.map((m) => {
+  const rows = visible.map((m) => {
     const income = m.income + fixedIncome;
     const expense = m.expense + fixedExpense;
     return { ...m, income, expense, balance: income - expense };
@@ -588,8 +596,19 @@ function ProjectionPanel({ months, loading, fixedIncome, fixedExpense, horizon, 
             </div>
 
             <p className="px-5 pb-1 pt-3 text-xs text-[var(--text-secondary)]">
-              Soma de {horizon} meses a partir de {labelMonth(rows[0]?.yearMonth || '')}, já incluindo as parcelas
-              que caem nos próximos meses e os lançamentos fixos repetidos a cada mês.
+              {rows.length > 0 && (
+                <>
+                  Soma de {rows.length} {rows.length === 1 ? 'mês' : 'meses'} a partir de{' '}
+                  {labelMonth(rows[0].yearMonth)}, já incluindo as parcelas que caem nos próximos meses
+                  e os lançamentos fixos repetidos a cada mês.
+                </>
+              )}
+              {trimmed > 0 && (
+                <> Para no último mês com lançamento — {trimmed}{' '}
+                  {trimmed === 1 ? 'mês seguinte ficou' : 'meses seguintes ficaram'} de fora por ter
+                  só os fixos.
+                </>
+              )}
             </p>
 
             {/* Mês a mês */}
@@ -649,7 +668,7 @@ function ProjectionPanel({ months, loading, fixedIncome, fixedExpense, horizon, 
               <div className="flex items-center gap-3 px-3 pt-2.5 mt-1.5 border-t border-[var(--border-soft)]">
                 <span className="w-16 shrink-0 text-xs font-bold">Total</span>
                 <span className="flex-1 text-xs text-[var(--text-secondary)] hidden sm:block">
-                  {horizon} meses
+                  {rows.length} {rows.length === 1 ? 'mês' : 'meses'}
                 </span>
                 <span className="w-24 shrink-0 text-right text-sm font-bold tabular-nums hidden sm:block"
                   style={{ color: 'var(--success)' }}>
