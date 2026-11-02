@@ -191,10 +191,12 @@ function getRoutine() {
   return c.routine;
 }
 
+// Guarda em horas decimais, arredondando para o minuto mais próximo —
+// assim 40min vira 0.6667 e volta como 40min, sem virar meia hora.
 function parseHours(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return 0;
-  return Math.min(24, Math.round(n * 2) / 2); // meia em meia hora
+  return Math.min(24, Math.round(n * 60) / 60);
 }
 
 // GET /api/checklist/routine?month=YYYY-MM
@@ -225,7 +227,8 @@ router.get('/routine', (req, res) => {
   const average = {};
   if (filled.length > 0) {
     for (const [actId, sum] of Object.entries(totals)) {
-      average[actId] = Math.round((sum / filled.length) * 10) / 10;
+      // Arredonda no minuto, não no décimo de hora, senão 35min viraria 36min.
+      average[actId] = Math.round((sum / filled.length) * 60) / 60;
     }
   }
 
