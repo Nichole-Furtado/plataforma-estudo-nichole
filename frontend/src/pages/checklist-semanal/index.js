@@ -457,7 +457,7 @@ export default function ChecklistPage() {
           type="text" value={newName} onChange={e => setNewName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleAdd()}
           placeholder="Adicionar hábito (ex: Beber 2L de água)..."
-          className="flex-1 bg-transparent text-sm outline-none px-1"
+          className="flex-1 min-w-0 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm placeholder-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all"
           style={{ color: 'var(--text-primary)' }}
         />
         <div className="flex items-center gap-2">
@@ -900,7 +900,7 @@ function RoutineSection({ year, month, daysInMonth }) {
               type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               placeholder="Nova atividade (ex: Trabalho, Sono, Academia)..."
-              className="flex-1 bg-transparent text-sm outline-none"
+              className="flex-1 min-w-0 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-sm placeholder-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] transition-all"
               style={{ color: 'var(--text-primary)' }}
             />
             <button onClick={handleAdd} disabled={!newName.trim() || adding}
