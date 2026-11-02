@@ -231,23 +231,39 @@ export async function limparConcluidos() {
 export async function fetchHabits() {
   return apiFetch('/api/checklist/habits');
 }
-export async function addHabit(name) {
-  return apiFetch('/api/checklist/habits', { method: 'POST', body: JSON.stringify({ name }) });
+export async function addHabit(name, type = 'boa', points = 1) {
+  return apiFetch('/api/checklist/habits', {
+    method: 'POST',
+    body: JSON.stringify({ name, type, points }),
+  });
 }
-export async function updateHabit(id, name) {
-  return apiFetch(`/api/checklist/habits/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) });
+// Aceita updateHabit(id, 'novo nome') ou updateHabit(id, { name, type, points }).
+export async function updateHabit(id, data) {
+  const body = typeof data === 'string' ? { name: data } : data;
+  return apiFetch(`/api/checklist/habits/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 }
 export async function removeHabit(id) {
   return apiFetch(`/api/checklist/habits/${id}`, { method: 'DELETE' });
 }
-export async function fetchWeek(weekKey) {
-  return apiFetch(`/api/checklist/week/${weekKey}`);
+// full=true traz { done: [], miss: [] }; sem ele vem só a lista de dias feitos.
+export async function fetchWeek(weekKey, full = true) {
+  return apiFetch(`/api/checklist/week/${weekKey}${full ? '?full=1' : ''}`);
+}
+// state: 'none' | 'done' | 'miss'
+export async function setDayState(weekKey, habitId, day, state) {
+  return apiFetch(`/api/checklist/week/${weekKey}/set`, {
+    method: 'PATCH',
+    body: JSON.stringify({ habitId, day, state }),
+  });
 }
 export async function toggleDay(weekKey, habitId, day) {
   return apiFetch(`/api/checklist/week/${weekKey}/toggle`, {
     method: 'PATCH',
     body: JSON.stringify({ habitId, day }),
   });
+}
+export async function fetchChecklistSummary(from, months = 6) {
+  return apiFetch(`/api/checklist/summary?from=${from}&months=${months}`);
 }
 
 // ========== Busca por Palavras-chave ==========
