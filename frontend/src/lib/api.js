@@ -266,6 +266,34 @@ export async function fetchChecklistSummary(from, months = 6) {
   return apiFetch(`/api/checklist/summary?from=${from}&months=${months}`);
 }
 
+// ========== Rotina do dia (24 horas) ==========
+
+export async function fetchRoutine(month) {
+  return apiFetch(`/api/checklist/routine?month=${month}`);
+}
+export async function addRoutineActivity(name) {
+  return apiFetch('/api/checklist/routine/activities', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+export async function updateRoutineActivity(id, name) {
+  return apiFetch(`/api/checklist/routine/activities/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+}
+export async function removeRoutineActivity(id) {
+  return apiFetch(`/api/checklist/routine/activities/${id}`, { method: 'DELETE' });
+}
+// date no formato YYYY-MM-DD; hours 0 remove o lançamento.
+export async function setRoutineHours(date, activityId, hours) {
+  return apiFetch(`/api/checklist/routine/day/${date}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ activityId, hours }),
+  });
+}
+
 // ========== Busca por Palavras-chave ==========
 
 export async function searchByKeyword(q) {
