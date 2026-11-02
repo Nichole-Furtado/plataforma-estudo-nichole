@@ -179,6 +179,126 @@ router.get('/summary', (req, res) => {
   res.json({ months: result, habits: habits.length });
 });
 
+// ── Rotina do dia (24 horas) ──────────────────────────────────────────────────
+// Guardada dentro de checklist.routine:
+//   { activities: [{id, name}], days: { "YYYY-MM-DD": { activityId: horas } } }
+
+function getRoutine() {
+  const c = checklist();
+  if (!c.routine || typeof c.routine !== 'object') c.routine = { activities: [], days: {} };
+  if (!Array.isArray(c.routine.activities)) c.routine.activities = [];
+  if (!c.routine.days || typeof c.routine.days !== 'object') c.routine.days = {};
+  return c.routine;
+}
+
+function parseHours(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(24, Math.round(n * 2) / 2); // meia em meia hora
+}
+
+// GET /api/checklist/routine?month=YYYY-MM
+router.get('/routine', (req, res) => {
+  const routine = getRoutine();
+  const m = String(req.query.month || '').match(/^(\d{4})-(\d{2})$/);
+  if (!m) return res.status(400).json({ error: 'Parâmetro "month" deve ser YYYY-MM' });
+
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  const days = {};
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = `${year}-${pad(month)}-${pad(d)}`;
+    if (routine.days[key]) days[String(d)] = routine.days[key];
+  }
+
+  // Média considerando só os dias preenchidos — dividir por 30 quando você
+  // lançou 4 dias daria um retrato errado da rotina.
+  const filled = Object.keys(days);
+  const totals = {};
+  for (const d of filled) {
+    for (const [actId, hours] of Object.entries(days[d] || {})) {
+      totals[actId] = (totals[actId] || 0) + Number(hours || 0);
+    }
+  }
+  const average = {};
+  if (filled.length > 0) {
+    for (const [actId, sum] of Object.entries(totals)) {
+      average[actId] = Math.round((sum / filled.length) * 10) / 10;
+    }
+  }
+
+  res.json({
+    activities: routine.activities,
+    days,
+    average,
+    filledDays: filled.length,
+    daysInMonth,
+  });
+});
+
+router.post('/routine/activities', async (req, res) => {
+  const { name } = req.body;
+  if (!name || !String(name).trim())
+    return res.status(400).json({ error: 'Nome é obrigatório' });
+  const routine = getRoutine();
+  const activity = { id: makeId(), name: String(name).trim() };
+  routine.activities.push(activity);
+  await persist('checklist');
+  res.json({ activity, activities: routine.activities });
+});
+
+router.patch('/routine/activities/:id', async (req, res) => {
+  const routine = getRoutine();
+  const activity = routine.activities.find((a) => a.id === req.params.id);
+  if (!activity) return res.status(404).json({ error: 'Atividade não encontrada' });
+  const { name } = req.body;
+  if (name !== undefined) activity.name = String(name).trim();
+  await persist('checklist');
+  res.json({ activity, activities: routine.activities });
+});
+
+router.delete('/routine/activities/:id', async (req, res) => {
+  const routine = getRoutine();
+  const before = routine.activities.length;
+  routine.activities = routine.activities.filter((a) => a.id !== req.params.id);
+  if (routine.activities.length === before)
+    return res.status(404).json({ error: 'Atividade não encontrada' });
+  // Remove as horas lançadas dessa atividade em todos os dias.
+  for (const key of Object.keys(routine.days)) {
+    if (routine.days[key] && routine.days[key][req.params.id] !== undefined) {
+      delete routine.days[key][req.params.id];
+      if (Object.keys(routine.days[key]).length === 0) delete routine.days[key];
+    }
+  }
+  await persist('checklist');
+  res.json({ activities: routine.activities });
+});
+
+// PATCH /api/checklist/routine/day/:date   body: { activityId, hours }
+router.patch('/routine/day/:date', async (req, res) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(req.params.date))
+    return res.status(400).json({ error: 'Data deve ser YYYY-MM-DD' });
+  const { activityId, hours } = req.body;
+  if (!activityId) return res.status(400).json({ error: 'activityId é obrigatório' });
+
+  const routine = getRoutine();
+  if (!routine.activities.some((a) => a.id === activityId))
+    return res.status(404).json({ error: 'Atividade não encontrada' });
+
+  const day = routine.days[req.params.date] || {};
+  const h = parseHours(hours);
+  if (h > 0) day[activityId] = h;
+  else delete day[activityId];
+
+  if (Object.keys(day).length > 0) routine.days[req.params.date] = day;
+  else delete routine.days[req.params.date];
+
+  await persist('checklist');
+  res.json({ date: req.params.date, day: routine.days[req.params.date] || {} });
+});
+
 // ── Semanas ───────────────────────────────────────────────────────────────────
 
 // Sem ?full=1 responde no formato antigo (só a lista de dias feitos), para
