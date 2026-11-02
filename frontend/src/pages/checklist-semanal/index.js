@@ -662,12 +662,17 @@ export default function ChecklistPage() {
 const SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
 const colorFor = (i) => SERIES[i] || 'var(--text-secondary)';
 
+// Horas decimais → "5h", "40min", "1h35", "17h30"
+const toMinutes = (h) => Math.round((Number(h) || 0) * 60);
+
 const fmtH = (h) => {
-  if (!h) return '0h';
-  const whole = Math.floor(h);
-  const half = h - whole >= 0.5;
-  if (whole === 0) return '30min';
-  return `${whole}h${half ? '30' : ''}`;
+  const mins = toMinutes(h);
+  if (mins === 0) return '0h';
+  const H = Math.floor(mins / 60);
+  const M = mins % 60;
+  if (H === 0) return `${M}min`;
+  if (M === 0) return `${H}h`;
+  return `${H}h${String(M).padStart(2, '0')}`;
 };
 
 function DayBar({ segments, scaleTo }) {
@@ -733,6 +738,14 @@ function RoutineSection({ year, month, daysInMonth }) {
   const [newName, setNewName] = useState('');
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState(null);
+  // Enquanto você digita, o valor fica aqui e só vai para o servidor depois de
+  // uma pausa — senão cada tecla viraria uma gravação.
+  const [draft, setDraft] = useState({});
+  const timers = useRef({});
+
+  useEffect(() => () => {
+    Object.values(timers.current).forEach(clearTimeout);
+  }, []);
 
   // Ao trocar de mês, volta para hoje (se for o mês atual) ou para o dia 1.
   useEffect(() => {
@@ -762,10 +775,15 @@ function RoutineSection({ year, month, daysInMonth }) {
   const dateKey = `${monthKey}-${pad(day)}`;
   const dayHours = days[String(day)] || {};
 
+  const hoursFor = (actId) => {
+    const k = `${dateKey}:${actId}`;
+    return draft[k] !== undefined ? draft[k] : Number(dayHours[actId] || 0);
+  };
+
   const segments = activities.map((a, i) => ({
     id: a.id,
     name: a.name,
-    hours: Number(dayHours[a.id] || 0),
+    hours: hoursFor(a.id),
     color: colorFor(i),
   }));
   const used = segments.reduce((s, x) => s + x.hours, 0);
@@ -780,13 +798,28 @@ function RoutineSection({ year, month, daysInMonth }) {
   }));
   const avgUsed = avgSegments.reduce((s, x) => s + x.hours, 0);
 
-  const handleHours = async (activityId, value) => {
-    const hours = value === '' ? 0 : Number(value);
-    try {
-      const res = await setRoutineHours(dateKey, activityId, hours);
-      setDays((prev) => ({ ...prev, [String(day)]: res.day }));
-      refresh(false);
-    } catch (err) { alert(err.message); }
+  // Recebe horas e minutos separados e guarda como horas decimais.
+  const handleHM = (activityId, nextH, nextM) => {
+    const h = Math.max(0, Math.min(23, Number.isFinite(nextH) ? nextH : 0));
+    const m = Math.max(0, Math.min(59, Number.isFinite(nextM) ? nextM : 0));
+    const hours = Math.round((h * 60 + m)) / 60;
+
+    const k = `${dateKey}:${activityId}`;
+    setDraft((prev) => ({ ...prev, [k]: hours }));
+
+    clearTimeout(timers.current[k]);
+    timers.current[k] = setTimeout(async () => {
+      try {
+        const res = await setRoutineHours(dateKey, activityId, hours);
+        setDays((prev) => ({ ...prev, [String(day)]: res.day }));
+        setDraft((prev) => {
+          const next = { ...prev };
+          delete next[k];
+          return next;
+        });
+        refresh(false);
+      } catch (err) { alert(err.message); }
+    }, 600);
   };
 
   const handleAdd = async () => {
@@ -874,23 +907,42 @@ function RoutineSection({ year, month, daysInMonth }) {
             </div>
           ) : (
             <ul className="px-2 py-2">
-              {activities.map((a, i) => (
-                <li key={a.id} className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-hover)]/50 transition-colors">
-                  <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: colorFor(i) }} />
-                  <span className="flex-1 text-sm truncate" title={a.name}>{a.name}</span>
-                  <input
-                    type="number" min="0" max="24" step="0.5"
-                    value={dayHours[a.id] ?? ''}
-                    onChange={(e) => handleHours(a.id, e.target.value)}
-                    placeholder="0"
-                    className="w-20 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-2 py-1 text-sm text-center tabular-nums focus:outline-none focus:border-[var(--accent)] transition-all"
-                  />
-                  <span className="text-xs w-5" style={{ color: 'var(--text-secondary)' }}>h</span>
-                  <button onClick={() => handleRemove(a.id, a.name)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[var(--bg-hover)] transition-colors sm:opacity-0 sm:group-hover:opacity-100"
-                    title="Remover atividade"><Trash2 size={13} /></button>
-                </li>
-              ))}
+              {activities.map((a, i) => {
+                const mins = toMinutes(hoursFor(a.id));
+                const h = Math.floor(mins / 60);
+                const m = mins % 60;
+                return (
+                  <li key={a.id} className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-hover)]/50 transition-colors">
+                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: colorFor(i) }} />
+                    <span className="flex-1 text-sm truncate" title={a.name}>{a.name}</span>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <input
+                        type="number" min="0" max="23" step="1"
+                        value={mins === 0 ? '' : h}
+                        onChange={(e) => handleHM(a.id, parseInt(e.target.value, 10) || 0, m)}
+                        placeholder="0"
+                        aria-label={`${a.name}: horas`}
+                        className="w-14 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-2 py-1 text-sm text-center tabular-nums focus:outline-none focus:border-[var(--accent)] transition-all"
+                      />
+                      <span className="text-xs w-3" style={{ color: 'var(--text-secondary)' }}>h</span>
+                      <input
+                        type="number" min="0" max="59" step="5"
+                        value={mins === 0 ? '' : m}
+                        onChange={(e) => handleHM(a.id, h, parseInt(e.target.value, 10) || 0)}
+                        placeholder="00"
+                        aria-label={`${a.name}: minutos`}
+                        className="w-16 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-2 py-1 text-sm text-center tabular-nums focus:outline-none focus:border-[var(--accent)] transition-all"
+                      />
+                      <span className="text-xs w-7" style={{ color: 'var(--text-secondary)' }}>min</span>
+                    </div>
+
+                    <button onClick={() => handleRemove(a.id, a.name)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[var(--bg-hover)] transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+                      title="Remover atividade"><Trash2 size={13} /></button>
+                  </li>
+                );
+              })}
             </ul>
           )}
 
@@ -918,7 +970,7 @@ function RoutineSection({ year, month, daysInMonth }) {
                   Média do mês
                 </span>
                 <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                  {fmtH(Math.round(avgUsed * 2) / 2)} por dia · {filledDays} de {daysInMonth} dias preenchidos
+                  {fmtH(avgUsed)} por dia · {filledDays} de {daysInMonth} dias preenchidos
                 </span>
               </div>
               <DayBar segments={avgSegments} />
