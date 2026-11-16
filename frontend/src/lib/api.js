@@ -156,8 +156,10 @@ export async function updateFinanceiroEntry(yearMonth, id, data) {
   });
 }
 
-export async function removeFinanceiroEntry(yearMonth, id) {
-  return apiFetch(`/api/financeiro/${yearMonth}/entry/${id}`, {
+// Parcelado remove o grupo inteiro; apenasEste=true remove só a parcela do mês.
+export async function removeFinanceiroEntry(yearMonth, id, apenasEste = false) {
+  const query = apenasEste ? '?apenasEste=1' : '';
+  return apiFetch(`/api/financeiro/${yearMonth}/entry/${id}${query}`, {
     method: 'DELETE',
   });
 }
