@@ -215,14 +215,53 @@ router.patch('/:yearMonth/entry/:id', async (req, res) => {
   res.json({ message: 'Lançamento atualizado', entry, data: month });
 });
 
+// DELETE /api/financeiro/:yearMonth/entry/:id
+// Lançamento parcelado apaga o grupo inteiro, em todos os meses.
+// Com ?apenasEste=1 apaga só a parcela daquele mês.
 router.delete('/:yearMonth/entry/:id', async (req, res) => {
   const { yearMonth, id } = req.params;
   const month = financeiro()[yearMonth];
   if (!month) return res.status(404).json({ error: 'Mês não encontrado' });
-  month.incomes = month.incomes.filter((e) => e.id !== id);
-  month.expenses = month.expenses.filter((e) => e.id !== id);
+
+  const entry = [...(month.incomes || []), ...(month.expenses || [])].find((e) => e.id === id);
+  const grupoId = entry?.grupoId;
+  const apenasEste = req.query.apenasEste === '1';
+
+  let removed = 0;
+  let meses = 0;
+
+  if (grupoId && !apenasEste) {
+    Object.keys(financeiro()).forEach((ym) => {
+      const monthData = financeiro()[ym];
+      // _fixed e _fixedExpenses são arrays, não meses — ficam de fora.
+      if (!monthData || Array.isArray(monthData) || typeof monthData !== 'object') return;
+
+      let removidosNoMes = 0;
+      ['incomes', 'expenses'].forEach((list) => {
+        if (!Array.isArray(monthData[list])) return;
+        const before = monthData[list].length;
+        monthData[list] = monthData[list].filter((e) => e.grupoId !== grupoId);
+        removidosNoMes += before - monthData[list].length;
+      });
+      if (removidosNoMes > 0) meses++;
+      removed += removidosNoMes;
+    });
+  } else {
+    const before = (month.incomes || []).length + (month.expenses || []).length;
+    month.incomes = (month.incomes || []).filter((e) => e.id !== id);
+    month.expenses = (month.expenses || []).filter((e) => e.id !== id);
+    removed = before - (month.incomes.length + month.expenses.length);
+    meses = removed > 0 ? 1 : 0;
+  }
+
   await persist('financeiro');
-  res.json({ message: 'Lançamento removido', data: month });
+  res.json({
+    message: 'Lançamento removido',
+    removed,
+    meses,
+    grupo: Boolean(grupoId) && !apenasEste,
+    data: financeiro()[yearMonth] || { incomes: [], expenses: [] },
+  });
 });
 
 module.exports = router;
