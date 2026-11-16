@@ -217,9 +217,19 @@ export default function FinanceiroPage() {
     } catch (err) { alert(err.message); }
   };
 
-  const handleRemove = async (id) => {
+  const handleRemove = async (entry) => {
+    const parcelado = (entry.parcelas || 1) > 1 && entry.grupoId;
+    if (parcelado) {
+      const ok = confirm(
+        `"${entry.description}" está parcelado em ${entry.parcelas}x.\n\n` +
+        'Remover TODAS as parcelas, em todos os meses?\n\n' +
+        'Para tirar só a deste mês sem apagar as outras, cancele e use a bolinha ' +
+        'ao lado do lançamento para desativá-la.'
+      );
+      if (!ok) return;
+    }
     try {
-      const res = await removeFinanceiroEntry(yearMonth, id);
+      const res = await removeFinanceiroEntry(yearMonth, entry.id);
       applyData(res.data);
     } catch (err) { alert(err.message); }
   };
@@ -1031,9 +1041,9 @@ function EntryRow({ entry, type, accent, striped, onUpdate, onRemove }) {
             <button onClick={() => setEditing(true)}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-hover)] transition-colors"
               title="Editar"><Pencil size={15} /></button>
-            <button onClick={() => onRemove(entry.id)}
+            <button onClick={() => onRemove(entry)}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[var(--bg-hover)] transition-colors"
-              title="Remover"><Trash2 size={15} /></button>
+              title={hasParcelas ? 'Remover todas as parcelas' : 'Remover'}><Trash2 size={15} /></button>
           </div>
         </>
       )}
