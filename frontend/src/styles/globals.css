@@ -4,45 +4,97 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
+/*
+ * O tema escuro é o padrão: fica no :root, então vale mesmo que o
+ * JavaScript não rode. O claro entra só quando a pessoa escolhe, pelo
+ * atributo data-theme="light" no <html>.
+ */
 :root {
-  /* Superfícies (tema claro) */
+  color-scheme: dark;
+
+  /* Superfícies */
+  --bg-primary: #0f111b;
+  --bg-secondary: #1a1e30;
+  --bg-card: #161a27;
+  --bg-hover: #212639;
+  --bg-subtle: #1b1f2e;
+
+  /* Texto */
+  --text-primary: #e9eaf4;
+  --text-secondary: #9aa0bd;
+  --text-on-accent: #ffffff;
+
+  /* Acento índigo */
+  --accent: #7c7ff7;
+  --accent-hover: #9397fa;
+  --accent-soft: rgba(124, 127, 247, 0.16);
+
+  /* Estados (um pouco mais claros para fundo escuro) */
+  --success: #34d07f;
+  --warning: #f0a93a;
+  --error: #f87171;
+
+  /* Bordas */
+  --border: #2a3047;
+  --border-soft: #222739;
+
+  /* Superfície de código (escura em qualquer tema) */
+  --code-bg: #10111d;
+  --code-surface: #191c2e;
+  --code-border: #272a40;
+  --code-text: #e2e4f0;
+  --code-text-dim: #9396b8;
+
+  /* Sombras: no escuro a sombra é mais profunda e menos difusa */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-md: 0 8px 24px -10px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 20px 48px -16px rgba(0, 0, 0, 0.65);
+
+  /* Pedaços que não são cor de texto nem de fundo */
+  --scrollbar-thumb: #333a56;
+  --scrollbar-thumb-hover: #434b6e;
+  --glass-bg: rgba(18, 21, 33, 0.72);
+  --wash-1: rgba(124, 127, 247, 0.14);
+  --wash-2: rgba(167, 139, 250, 0.10);
+  --wash-3: rgba(52, 208, 127, 0.06);
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
   --bg-primary: #f4f5fb;
   --bg-secondary: #eef0f8;
   --bg-card: #ffffff;
   --bg-hover: #eef1fb;
   --bg-subtle: #f8f9fd;
 
-  /* Texto */
   --text-primary: #1b1d2e;
   --text-secondary: #6b7088;
   --text-on-accent: #ffffff;
 
-  /* Acento índigo */
   --accent: #6366f1;
   --accent-hover: #4f46e5;
   --accent-soft: rgba(99, 102, 241, 0.10);
 
-  /* Estados */
   --success: #16a34a;
   --warning: #d97706;
   --error: #ef4444;
 
-  /* Bordas */
   --border: #e3e6f2;
   --border-soft: #edeef6;
 
-  /* Superfície de código (permanece escura em qualquer tema) */
-  --code-bg: #1a1b2e;
-  --code-surface: #20223a;
-  --code-border: #2d2f4a;
-  --code-text: #e2e4f0;
-  --code-text-dim: #9396b8;
-
-  /* Sombras suaves para fundo claro */
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
   --shadow-md: 0 8px 24px -10px rgba(16, 24, 40, 0.14);
   --shadow-lg: 0 20px 48px -16px rgba(16, 24, 40, 0.20);
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --scrollbar-thumb: #d3d7e6;
+  --scrollbar-thumb-hover: #b9bed4;
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --wash-1: rgba(99, 102, 241, 0.08);
+  --wash-2: rgba(139, 92, 246, 0.07);
+  --wash-3: rgba(22, 163, 74, 0.04);
 }
 
 * {
@@ -64,9 +116,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg-primary);
   background-image:
-    radial-gradient(55rem 55rem at 8% -12%, rgba(99, 102, 241, 0.08), transparent 60%),
-    radial-gradient(48rem 48rem at 100% 0%, rgba(139, 92, 246, 0.07), transparent 55%),
-    radial-gradient(42rem 42rem at 50% 120%, rgba(22, 163, 74, 0.04), transparent 60%);
+    radial-gradient(55rem 55rem at 8% -12%, var(--wash-1), transparent 60%),
+    radial-gradient(48rem 48rem at 100% 0%, var(--wash-2), transparent 55%),
+    radial-gradient(42rem 42rem at 50% 120%, var(--wash-3), transparent 60%);
   background-attachment: fixed;
 }
 
@@ -93,20 +145,30 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d3d7e6;
+  background: var(--scrollbar-thumb);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #b9bed4;
+  background: var(--scrollbar-thumb-hover);
   background-clip: padding-box;
+}
+
+/* Barra de rolagem escondida — usada no menu, que rola na horizontal
+   em telas estreitas sem mostrar barra. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* Utilitários de superfície e movimento */
 .glass {
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--glass-bg);
   backdrop-filter: saturate(140%) blur(14px);
   -webkit-backdrop-filter: saturate(140%) blur(14px);
 }
