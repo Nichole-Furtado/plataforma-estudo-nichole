@@ -90,14 +90,28 @@ const TRILHA_INICIAL = [
   },
 ];
 
-const NIVEIS = [
-  { nivel: 1, nome: 'Curioso', minimo: 0 },
-  { nivel: 2, nome: 'Explorador', minimo: 60 },
-  { nivel: 3, nome: 'Validador', minimo: 150 },
-  { nivel: 4, nome: 'Vendedor', minimo: 260 },
-  { nivel: 5, nome: 'Operador', minimo: 380 },
-  { nivel: 6, nome: 'Empreendedor', minimo: 500 },
+/** Níveis iniciais — também viram dado editável na primeira abertura. */
+const NIVEIS_INICIAIS = [
+  { id: 'nivel-curioso', nome: 'Curioso', minimo: 0 },
+  { id: 'nivel-explorador', nome: 'Explorador', minimo: 60 },
+  { id: 'nivel-validador', nome: 'Validador', minimo: 150 },
+  { id: 'nivel-vendedor', nome: 'Vendedor', minimo: 260 },
+  { id: 'nivel-operador', nome: 'Operador', minimo: 380 },
+  { id: 'nivel-empreendedor', nome: 'Empreendedor', minimo: 500 },
 ];
+
+function parseMinimo(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.min(99999, Math.round(n)));
+}
+
+/** Ordena por pontuação e numera na sequência — a ordem vem do mínimo. */
+function niveisOrdenados(emp) {
+  return [...emp.niveis]
+    .sort((a, b) => a.minimo - b.minimo)
+    .map((n, i) => ({ ...n, nivel: i + 1 }));
+}
 
 function parsePontos(value, fallback = 10) {
   const n = Number(value);
@@ -107,6 +121,15 @@ function parsePontos(value, fallback = 10) {
 
 function parseCor(value, fallback) {
   return /^#[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : fallback;
+}
+
+/** Prazo no formato YYYY-MM-DD. String vazia limpa o prazo. */
+function parsePrazo(value) {
+  const v = String(value ?? '').trim();
+  if (!v) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const d = new Date(`${v}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : v;
 }
 
 /**
@@ -122,7 +145,19 @@ async function garantir() {
   const emp = state.empreender;
   if (!emp.progress || typeof emp.progress !== 'object') emp.progress = {};
 
-  if (Array.isArray(emp.etapas)) return emp;
+  let mudou = false;
+
+  // Os níveis viraram editáveis depois das etapas, então são semeados por
+  // conta própria — quem já migrou as etapas antes também os recebe.
+  if (!Array.isArray(emp.niveis) || emp.niveis.length === 0) {
+    emp.niveis = NIVEIS_INICIAIS.map((n) => ({ ...n }));
+    mudou = true;
+  }
+
+  if (Array.isArray(emp.etapas)) {
+    if (mudou) await persist('empreender');
+    return emp;
+  }
 
   emp.etapas = TRILHA_INICIAL.map((e) => ({
     id: e.id,
@@ -165,13 +200,21 @@ function calcular(emp) {
       if (emp.progress[m.id]?.done) { feitas++; pontos += m.pontos; }
     }
   }
-  const atual = [...NIVEIS].reverse().find((n) => pontos >= n.minimo) || NIVEIS[0];
-  const proximo = NIVEIS.find((n) => n.minimo > pontos) || null;
+  const niveis = niveisOrdenados(emp);
+  // O nível mais baixo é o piso, mesmo que o mínimo dele não seja zero.
+  const atual = [...niveis].reverse().find((n) => pontos >= n.minimo) || niveis[0] || null;
+  const proximo = niveis.find((n) => n.minimo > pontos) || null;
   return { pontos, pontosPossiveis, feitas, total, nivel: atual, proximoNivel: proximo };
 }
 
 function resposta(emp) {
-  return { etapas: emp.etapas, progress: emp.progress, niveis: NIVEIS, cores: CORES, ...calcular(emp) };
+  return {
+    etapas: emp.etapas,
+    progress: emp.progress,
+    niveis: niveisOrdenados(emp),
+    cores: CORES,
+    ...calcular(emp),
+  };
 }
 
 // ── Leitura ───────────────────────────────────────────────────────────────────
@@ -243,6 +286,53 @@ router.patch('/etapa/:id/mover', async (req, res) => {
   res.json(resposta(emp));
 });
 
+// ── Níveis ────────────────────────────────────────────────────────────────────
+
+router.post('/nivel', async (req, res) => {
+  const emp = await garantir();
+  const { nome, minimo } = req.body;
+  if (!nome || !String(nome).trim())
+    return res.status(400).json({ error: 'Nome do nível é obrigatório' });
+
+  const nivel = {
+    id: makeId('nivel'),
+    nome: String(nome).trim(),
+    minimo: parseMinimo(minimo, 0),
+  };
+  emp.niveis.push(nivel);
+  await persist('empreender');
+  // `nivelCriado`, e não `nivel`: resposta() já traz `nivel` com o nível
+  // atual da pessoa, e o espalhamento sobrescreveria este aqui.
+  res.json({ nivelCriado: nivel, ...resposta(emp) });
+});
+
+router.patch('/nivel/:id', async (req, res) => {
+  const emp = await garantir();
+  const nivel = emp.niveis.find((n) => n.id === req.params.id);
+  if (!nivel) return res.status(404).json({ error: 'Nível não encontrado' });
+
+  const { nome, minimo } = req.body;
+  if (nome !== undefined && String(nome).trim()) nivel.nome = String(nome).trim();
+  if (minimo !== undefined) nivel.minimo = parseMinimo(minimo, nivel.minimo);
+
+  await persist('empreender');
+  res.json({ nivelAtualizado: nivel, ...resposta(emp) });
+});
+
+router.delete('/nivel/:id', async (req, res) => {
+  const emp = await garantir();
+  if (emp.niveis.length <= 1)
+    return res.status(400).json({ error: 'Deixe pelo menos um nível' });
+
+  const antes = emp.niveis.length;
+  emp.niveis = emp.niveis.filter((n) => n.id !== req.params.id);
+  if (emp.niveis.length === antes)
+    return res.status(404).json({ error: 'Nível não encontrado' });
+
+  await persist('empreender');
+  res.json(resposta(emp));
+});
+
 // ── Missões ───────────────────────────────────────────────────────────────────
 
 router.post('/etapa/:etapaId/missao', async (req, res) => {
@@ -250,7 +340,7 @@ router.post('/etapa/:etapaId/missao', async (req, res) => {
   const etapa = emp.etapas.find((e) => e.id === req.params.etapaId);
   if (!etapa) return res.status(404).json({ error: 'Etapa não encontrada' });
 
-  const { titulo, descricao, pontos } = req.body;
+  const { titulo, descricao, pontos, prazo } = req.body;
   if (!titulo || !String(titulo).trim())
     return res.status(400).json({ error: 'Título é obrigatório' });
 
@@ -259,6 +349,7 @@ router.post('/etapa/:etapaId/missao', async (req, res) => {
     titulo: String(titulo).trim(),
     descricao: String(descricao || '').trim(),
     pontos: parsePontos(pontos, 10),
+    prazo: parsePrazo(prazo),
   };
   etapa.missoes.push(missao);
   await persist('empreender');
@@ -272,11 +363,12 @@ router.patch('/missao/:id', async (req, res) => {
   const achado = acharMissao(emp, req.params.id);
   if (!achado) return res.status(404).json({ error: 'Missão não encontrada' });
   const { etapa, missao } = achado;
-  const { titulo, descricao, pontos, done, nota, etapaId } = req.body;
+  const { titulo, descricao, pontos, prazo, done, nota, etapaId } = req.body;
 
   if (titulo !== undefined && String(titulo).trim()) missao.titulo = String(titulo).trim();
   if (descricao !== undefined) missao.descricao = String(descricao).trim();
   if (pontos !== undefined) missao.pontos = parsePontos(pontos, missao.pontos);
+  if (prazo !== undefined) missao.prazo = parsePrazo(prazo);
 
   // Mudar de etapa: tira de uma lista e põe na outra.
   if (etapaId !== undefined && etapaId !== etapa.id) {
@@ -316,7 +408,14 @@ router.delete('/missao/:id', async (req, res) => {
 // devolve só as etapas e missões de fábrica que tiverem sido removidas.
 router.post('/restaurar', async (req, res) => {
   const emp = await garantir();
-  let etapasVoltaram = 0, missoesVoltaram = 0;
+  let etapasVoltaram = 0, missoesVoltaram = 0, niveisVoltaram = 0;
+
+  for (const base of NIVEIS_INICIAIS) {
+    if (!emp.niveis.some((n) => n.id === base.id)) {
+      emp.niveis.push({ ...base });
+      niveisVoltaram++;
+    }
+  }
 
   for (const base of TRILHA_INICIAL) {
     let etapa = emp.etapas.find((e) => e.id === base.id);
@@ -334,7 +433,7 @@ router.post('/restaurar', async (req, res) => {
   }
 
   await persist('empreender');
-  res.json({ etapasVoltaram, missoesVoltaram, ...resposta(emp) });
+  res.json({ etapasVoltaram, missoesVoltaram, niveisVoltaram, ...resposta(emp) });
 });
 
 module.exports = router;

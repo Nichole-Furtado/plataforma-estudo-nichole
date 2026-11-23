@@ -1,19 +1,112 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Rocket, Check, Plus, Trash2, ChevronRight, Trophy, Target, StickyNote, X,
-  Pencil, ChevronUp, ChevronDown, RotateCcw, FolderInput,
+  Pencil, ChevronUp, ChevronDown, RotateCcw, FolderInput, CalendarDays,
 } from 'lucide-react';
 import {
   fetchEmpreender, addEtapa, updateEtapa, removeEtapa, moverEtapa,
   addMissao, updateMissao, removeMissao, restaurarTrilha,
+  addNivel, updateNivel, removeNivel,
 } from '@/lib/api';
 
 const tint = (cor, pct) => `color-mix(in srgb, ${cor} ${pct}%, transparent)`;
 const CAMPO = 'bg-[var(--bg-subtle)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] transition-all';
 
+const hojeISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** Como mostrar o prazo: texto curto e a cor que ele merece. */
+function lerPrazo(prazo, feita) {
+  if (!prazo) return null;
+  const [a, m, d] = prazo.split('-').map(Number);
+  const rotulo = `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
+  if (feita) return { rotulo, cor: 'var(--text-secondary)', titulo: `Prazo era ${rotulo}` };
+
+  const hoje = hojeISO();
+  const umDia = 86400000;
+  const dias = Math.round((new Date(`${prazo}T00:00:00`) - new Date(`${hoje}T00:00:00`)) / umDia);
+
+  if (dias < 0) return { rotulo: `${rotulo} · atrasada`, cor: 'var(--error)', titulo: `Venceu há ${-dias} dia(s)` };
+  if (dias === 0) return { rotulo: `${rotulo} · hoje`, cor: 'var(--warning)', titulo: 'O prazo é hoje' };
+  if (dias <= 3) return { rotulo: `${rotulo} · ${dias}d`, cor: 'var(--warning)', titulo: `Faltam ${dias} dia(s)` };
+  return { rotulo, cor: 'var(--text-secondary)', titulo: `Faltam ${dias} dia(s)` };
+}
+
 // ── Cartão de nível ────────────────────────────────────────────────────────────
 
-function PainelNivel({ pontos, pontosPossiveis, feitas, total, nivel, proximoNivel }) {
+function LinhaNivel({ n, atual, acoes }) {
+  const [nome, setNome] = useState(n.nome);
+  const [minimo, setMinimo] = useState(String(n.minimo));
+
+  useEffect(() => { setNome(n.nome); setMinimo(String(n.minimo)); }, [n.nome, n.minimo]);
+
+  const salvar = () => {
+    if (!nome.trim()) { setNome(n.nome); return; }
+    if (nome.trim() === n.nome && Number(minimo) === n.minimo) return;
+    acoes.salvarNivel(n.id, { nome: nome.trim(), minimo: parseInt(minimo, 10) || 0 });
+  };
+
+  return (
+    <li className="flex items-center gap-2 px-3 py-2 rounded-lg"
+      style={{ background: atual ? 'var(--accent-soft)' : 'transparent' }}>
+      <span className="w-6 shrink-0 text-xs font-bold tabular-nums"
+        style={{ color: atual ? 'var(--accent)' : 'var(--text-secondary)' }}>{n.nivel}</span>
+      <input type="text" value={nome} onChange={(e) => setNome(e.target.value)}
+        onBlur={salvar} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+        className={`flex-1 min-w-0 ${CAMPO} py-1.5`} style={{ color: 'var(--text-primary)' }} />
+      <span className="text-xs shrink-0" style={{ color: 'var(--text-secondary)' }}>a partir de</span>
+      <input type="number" min="0" value={minimo} onChange={(e) => setMinimo(e.target.value)}
+        onBlur={salvar} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+        className={`w-20 ${CAMPO} py-1.5 text-center tabular-nums`} style={{ color: 'var(--text-primary)' }} />
+      <span className="text-xs shrink-0" style={{ color: 'var(--text-secondary)' }}>pts</span>
+      <button onClick={() => acoes.removerNivel(n.id, n.nome)}
+        className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--error)] hover:bg-[var(--bg-hover)] transition-colors"
+        title="Remover nível"><Trash2 size={13} /></button>
+    </li>
+  );
+}
+
+function EditorNiveis({ niveis, nivelAtual, acoes }) {
+  const [nome, setNome] = useState('');
+  const [minimo, setMinimo] = useState('');
+
+  const criar = () => {
+    if (!nome.trim()) return;
+    acoes.criarNivel({ nome: nome.trim(), minimo: parseInt(minimo, 10) || 0 });
+    setNome(''); setMinimo('');
+  };
+
+  return (
+    <div className="mt-5 pt-5 border-t border-[var(--border-soft)]">
+      <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>
+        A ordem vem da pontuação: o nível entra onde o mínimo dele mandar.
+      </p>
+      <ul className="space-y-1">
+        {niveis.map((n) => (
+          <LinhaNivel key={n.id} n={n} atual={n.id === nivelAtual?.id} acoes={acoes} />
+        ))}
+      </ul>
+      <div className="flex flex-wrap items-center gap-2 mt-3">
+        <input type="text" value={nome} onChange={(e) => setNome(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') criar(); }}
+          placeholder="Nome do novo nível"
+          className={`flex-1 min-w-[160px] ${CAMPO} py-1.5`} style={{ color: 'var(--text-primary)' }} />
+        <input type="number" min="0" value={minimo} onChange={(e) => setMinimo(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') criar(); }}
+          placeholder="pts"
+          className={`w-20 ${CAMPO} py-1.5 text-center tabular-nums`} style={{ color: 'var(--text-primary)' }} />
+        <button onClick={criar} disabled={!nome.trim()}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40"
+          style={{ background: 'var(--accent)' }}><Plus size={15} strokeWidth={2.4} /> Nível</button>
+      </div>
+    </div>
+  );
+}
+
+function PainelNivel({ pontos, pontosPossiveis, feitas, total, nivel, proximoNivel, niveis, acoes }) {
+  const [editando, setEditando] = useState(false);
   const base = nivel?.minimo ?? 0;
   const alvo = proximoNivel?.minimo ?? Math.max(pontos, 1);
   const pct = proximoNivel
@@ -46,6 +139,12 @@ function PainelNivel({ pontos, pontosPossiveis, feitas, total, nivel, proximoNiv
               {feitas}<span className="text-base font-medium" style={{ color: 'var(--text-secondary)' }}>/{total}</span>
             </p>
           </div>
+          <button onClick={() => setEditando((v) => !v)}
+            title={editando ? 'Fechar a edição dos níveis' : 'Editar os níveis'}
+            className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--bg-hover)]"
+            style={{ color: editando ? 'var(--accent)' : 'var(--text-secondary)' }}>
+            {editando ? <X size={17} /> : <Pencil size={15} />}
+          </button>
         </div>
       </div>
 
@@ -61,6 +160,10 @@ function PainelNivel({ pontos, pontosPossiveis, feitas, total, nivel, proximoNiv
         <div className="h-full rounded-full transition-all duration-700"
           style={{ width: `${pct}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent-hover))' }} />
       </div>
+
+      {editando && (
+        <EditorNiveis niveis={niveis || []} nivelAtual={nivel} acoes={acoes} />
+      )}
     </div>
   );
 }
@@ -73,6 +176,7 @@ function Missao({ missao, estado, cor, etapas, etapaId, onToggle, onSalvar, onNo
   const [titulo, setTitulo] = useState(missao.titulo);
   const [descricao, setDescricao] = useState(missao.descricao || '');
   const [pontos, setPontos] = useState(String(missao.pontos));
+  const [prazo, setPrazo] = useState(missao.prazo || '');
   const [destino, setDestino] = useState(etapaId);
   const [nota, setNota] = useState(estado?.nota || '');
 
@@ -81,8 +185,9 @@ function Missao({ missao, estado, cor, etapas, etapaId, onToggle, onSalvar, onNo
     setTitulo(missao.titulo);
     setDescricao(missao.descricao || '');
     setPontos(String(missao.pontos));
+    setPrazo(missao.prazo || '');
     setDestino(etapaId);
-  }, [missao.titulo, missao.descricao, missao.pontos, etapaId]);
+  }, [missao.titulo, missao.descricao, missao.pontos, missao.prazo, etapaId]);
 
   const salvarEdicao = () => {
     if (!titulo.trim()) return;
@@ -90,10 +195,13 @@ function Missao({ missao, estado, cor, etapas, etapaId, onToggle, onSalvar, onNo
       titulo: titulo.trim(),
       descricao: descricao.trim(),
       pontos: parseInt(pontos, 10) || 0,
+      prazo,
       ...(destino !== etapaId ? { etapaId: destino } : {}),
     });
     setModo(null);
   };
+
+  const info = lerPrazo(missao.prazo, feita);
 
   if (modo === 'editar') {
     return (
@@ -110,6 +218,16 @@ function Missao({ missao, estado, cor, etapas, etapaId, onToggle, onSalvar, onNo
               <input type="number" min="0" max="999" value={pontos} onChange={(e) => setPontos(e.target.value)}
                 className={`w-20 ${CAMPO} text-center tabular-nums`} style={{ color: 'var(--text-primary)' }} />
               <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>pontos</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <CalendarDays size={14} style={{ color: 'var(--text-secondary)' }} />
+              <input type="date" value={prazo} onChange={(e) => setPrazo(e.target.value)}
+                className={CAMPO} style={{ color: 'var(--text-primary)' }} title="Prazo da missão" />
+              {prazo && (
+                <button onClick={() => setPrazo('')} title="Tirar o prazo"
+                  className="w-7 h-7 rounded-lg flex items-center justify-center"
+                  style={{ color: 'var(--text-secondary)' }}><X size={14} /></button>
+              )}
             </div>
             <div className="flex items-center gap-1.5">
               <FolderInput size={14} style={{ color: 'var(--text-secondary)' }} />
@@ -151,8 +269,17 @@ function Missao({ missao, estado, cor, etapas, etapaId, onToggle, onSalvar, onNo
               }}>
               {missao.titulo}
             </p>
-            <span className="shrink-0 text-xs font-bold tabular-nums px-2 py-0.5 rounded-full"
-              style={{ background: tint(cor, 14), color: cor }}>+{missao.pontos}</span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {info && (
+                <span className="text-[11px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full flex items-center gap-1"
+                  style={{ background: tint(info.cor, 14), color: info.cor }}
+                  title={info.titulo}>
+                  <CalendarDays size={10} />{info.rotulo}
+                </span>
+              )}
+              <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-full"
+                style={{ background: tint(cor, 14), color: cor }}>+{missao.pontos}</span>
+            </div>
           </div>
 
           {missao.descricao && (
@@ -408,6 +535,12 @@ export default function EmpreenderPage() {
       if (!confirm(aviso)) return;
       tentar(() => removeEtapa(id));
     },
+    criarNivel: (data) => tentar(() => addNivel(data)),
+    salvarNivel: (id, data) => tentar(() => updateNivel(id, data)),
+    removerNivel: (id, nome) => {
+      if (!confirm(`Remover o nível "${nome}"?`)) return;
+      tentar(() => removeNivel(id));
+    },
   };
 
   const criarEtapa = async () => {
@@ -461,7 +594,7 @@ export default function EmpreenderPage() {
         </div>
       ) : (
         <>
-          <PainelNivel {...dados} />
+          <PainelNivel {...dados} acoes={acoes} />
 
           <div className="space-y-4">
             {dados.etapas.map((etapa, i) => (

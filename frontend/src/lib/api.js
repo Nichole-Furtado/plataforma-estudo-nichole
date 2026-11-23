@@ -321,7 +321,18 @@ export async function moverEtapa(id, direcao) {
   });
 }
 
-// Missões
+// Níveis — nome e a partir de quantos pontos cada um começa
+export async function addNivel(data) {
+  return apiFetch('/api/empreender/nivel', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function updateNivel(id, data) {
+  return apiFetch(`/api/empreender/nivel/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+export async function removeNivel(id) {
+  return apiFetch(`/api/empreender/nivel/${id}`, { method: 'DELETE' });
+}
+
+// Missões — data aceita também { prazo: 'YYYY-MM-DD' } ou '' para limpar
 export async function addMissao(etapaId, data) {
   return apiFetch(`/api/empreender/etapa/${etapaId}/missao`, {
     method: 'POST',
