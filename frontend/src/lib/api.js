@@ -296,6 +296,28 @@ export async function setRoutineHours(date, activityId, hours) {
   });
 }
 
+// ========== Empreender (missões e níveis) ==========
+
+export async function fetchEmpreender() {
+  return apiFetch('/api/empreender');
+}
+// data: { done?, nota? }
+export async function updateMissao(id, data) {
+  return apiFetch(`/api/empreender/missao/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+export async function addMissao(data) {
+  return apiFetch('/api/empreender/missao', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+export async function removeMissao(id) {
+  return apiFetch(`/api/empreender/missao/${id}`, { method: 'DELETE' });
+}
+
 // ========== Busca por Palavras-chave ==========
 
 export async function searchByKeyword(q) {
