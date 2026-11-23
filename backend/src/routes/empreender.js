@@ -2,19 +2,24 @@ const express = require('express');
 const router = express.Router();
 const { state, persist } = require('../state');
 
-function makeId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+function makeId(prefixo) {
+  return `${prefixo}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
+/** Paleta das etapas — ordem fixa, validada para fundo claro e escuro. */
+const CORES = [
+  '#7c7ff7', '#eb6834', '#1baf7a', '#eda100',
+  '#e87ba4', '#34d07f', '#9085e9', '#f87171',
+];
+
 /**
- * O catálogo de missões mora no código, não no banco: assim dá para corrigir
- * um texto ou acrescentar missão sem migração, e o que fica guardado é só o
- * seu progresso. As missões que você mesma criar ficam em `custom`.
+ * Trilha inicial. Serve só para semear a primeira vez: a partir daí tudo
+ * vira dado da Nichole, editável por ela — etapas inclusive. É o mesmo
+ * caminho que os módulos de estudo já seguem.
  */
-const ETAPAS = [
+const TRILHA_INICIAL = [
   {
-    id: 'ideia',
-    nome: 'Ideia',
+    id: 'ideia', nome: 'Ideia', cor: CORES[0],
     descricao: 'Sair da ideia vaga para algo que dá para explicar em uma frase.',
     missoes: [
       { id: 'ideia-frase', titulo: 'Escreva sua ideia em uma frase', pontos: 10,
@@ -28,8 +33,7 @@ const ETAPAS = [
     ],
   },
   {
-    id: 'validacao',
-    nome: 'Validação',
+    id: 'validacao', nome: 'Validação', cor: CORES[1],
     descricao: 'Descobrir se o problema existe para outras pessoas, antes de construir.',
     missoes: [
       { id: 'val-conversas', titulo: 'Converse com 5 pessoas do seu público', pontos: 30,
@@ -43,8 +47,7 @@ const ETAPAS = [
     ],
   },
   {
-    id: 'primeiro-cliente',
-    nome: 'Primeiro cliente',
+    id: 'primeiro-cliente', nome: 'Primeiro cliente', cor: CORES[2],
     descricao: 'Vender uma vez. É o marco que separa projeto de negócio.',
     missoes: [
       { id: 'cli-minimo', titulo: 'Defina a menor versão vendável', pontos: 25,
@@ -58,8 +61,7 @@ const ETAPAS = [
     ],
   },
   {
-    id: 'contas',
-    nome: 'Preço e contas',
+    id: 'contas', nome: 'Preço e contas', cor: CORES[3],
     descricao: 'Saber se o que você vende deixa dinheiro no fim do mês.',
     missoes: [
       { id: 'con-custo', titulo: 'Calcule seu custo por unidade', pontos: 25,
@@ -73,8 +75,7 @@ const ETAPAS = [
     ],
   },
   {
-    id: 'crescimento',
-    nome: 'Crescimento',
+    id: 'crescimento', nome: 'Crescimento', cor: CORES[4],
     descricao: 'Transformar venda que aconteceu em venda que se repete.',
     missoes: [
       { id: 'cre-canal', titulo: 'Escreva como o cliente te encontra', pontos: 25,
@@ -98,125 +99,242 @@ const NIVEIS = [
   { nivel: 6, nome: 'Empreendedor', minimo: 500 },
 ];
 
-function getEmpreender() {
-  if (!state.empreender || typeof state.empreender !== 'object') {
-    state.empreender = { progress: {}, custom: [] };
-  }
-  if (!state.empreender.progress || typeof state.empreender.progress !== 'object') {
-    state.empreender.progress = {};
-  }
-  if (!Array.isArray(state.empreender.custom)) state.empreender.custom = [];
-  return state.empreender;
-}
-
 function parsePontos(value, fallback = 10) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
-  return Math.max(1, Math.min(200, Math.round(n)));
+  return Math.max(0, Math.min(999, Math.round(n)));
 }
 
-/** Catálogo + as missões próprias, agrupado por etapa. */
-function montarEtapas() {
-  const { custom } = getEmpreender();
-  return ETAPAS.map((etapa) => ({
-    ...etapa,
-    missoes: [
-      ...etapa.missoes.map((m) => ({ ...m, propria: false })),
-      ...custom
-        .filter((m) => m.etapa === etapa.id)
-        .map((m) => ({ ...m, propria: true })),
-    ],
+function parseCor(value, fallback) {
+  return /^#[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : fallback;
+}
+
+/**
+ * Garante a estrutura nova e migra quem está na antiga.
+ *
+ * Antes: o catálogo vinha do código e só as missões criadas por ela ficavam
+ * guardadas, em `custom`. Agora as etapas inteiras são dado editável. A
+ * migração mantém os mesmos ids das missões, então nenhum progresso se perde,
+ * e traz as missões próprias para dentro da etapa a que pertenciam.
+ */
+async function garantir() {
+  if (!state.empreender || typeof state.empreender !== 'object') state.empreender = {};
+  const emp = state.empreender;
+  if (!emp.progress || typeof emp.progress !== 'object') emp.progress = {};
+
+  if (Array.isArray(emp.etapas)) return emp;
+
+  emp.etapas = TRILHA_INICIAL.map((e) => ({
+    id: e.id,
+    nome: e.nome,
+    descricao: e.descricao,
+    cor: e.cor,
+    missoes: e.missoes.map((m) => ({ ...m })),
   }));
+
+  for (const m of Array.isArray(emp.custom) ? emp.custom : []) {
+    const destino = emp.etapas.find((e) => e.id === m.etapa) || emp.etapas[0];
+    if (!destino) continue;
+    destino.missoes.push({
+      id: m.id,
+      titulo: m.titulo,
+      descricao: m.descricao || '',
+      pontos: parsePontos(m.pontos, 10),
+    });
+  }
+  delete emp.custom;
+
+  await persist('empreender');
+  return emp;
 }
 
-function calcular(etapas, progress) {
-  let pontos = 0;
-  let feitas = 0;
-  let total = 0;
-  let pontosPossiveis = 0;
+function acharMissao(emp, id) {
+  for (const etapa of emp.etapas) {
+    const missao = etapa.missoes.find((m) => m.id === id);
+    if (missao) return { etapa, missao };
+  }
+  return null;
+}
 
-  for (const etapa of etapas) {
+function calcular(emp) {
+  let pontos = 0, feitas = 0, total = 0, pontosPossiveis = 0;
+  for (const etapa of emp.etapas) {
     for (const m of etapa.missoes) {
       total++;
       pontosPossiveis += m.pontos;
-      if (progress[m.id]?.done) {
-        feitas++;
-        pontos += m.pontos;
+      if (emp.progress[m.id]?.done) { feitas++; pontos += m.pontos; }
+    }
+  }
+  const atual = [...NIVEIS].reverse().find((n) => pontos >= n.minimo) || NIVEIS[0];
+  const proximo = NIVEIS.find((n) => n.minimo > pontos) || null;
+  return { pontos, pontosPossiveis, feitas, total, nivel: atual, proximoNivel: proximo };
+}
+
+function resposta(emp) {
+  return { etapas: emp.etapas, progress: emp.progress, niveis: NIVEIS, cores: CORES, ...calcular(emp) };
+}
+
+// ── Leitura ───────────────────────────────────────────────────────────────────
+
+router.get('/', async (_req, res) => {
+  res.json(resposta(await garantir()));
+});
+
+// ── Etapas ────────────────────────────────────────────────────────────────────
+
+router.post('/etapa', async (req, res) => {
+  const emp = await garantir();
+  const { nome, descricao, cor } = req.body;
+  if (!nome || !String(nome).trim())
+    return res.status(400).json({ error: 'Nome da etapa é obrigatório' });
+
+  const etapa = {
+    id: makeId('etapa'),
+    nome: String(nome).trim(),
+    descricao: String(descricao || '').trim(),
+    cor: parseCor(cor, CORES[emp.etapas.length % CORES.length]),
+    missoes: [],
+  };
+  emp.etapas.push(etapa);
+  await persist('empreender');
+  res.json({ etapa, ...resposta(emp) });
+});
+
+router.patch('/etapa/:id', async (req, res) => {
+  const emp = await garantir();
+  const etapa = emp.etapas.find((e) => e.id === req.params.id);
+  if (!etapa) return res.status(404).json({ error: 'Etapa não encontrada' });
+
+  const { nome, descricao, cor } = req.body;
+  if (nome !== undefined && String(nome).trim()) etapa.nome = String(nome).trim();
+  if (descricao !== undefined) etapa.descricao = String(descricao).trim();
+  if (cor !== undefined) etapa.cor = parseCor(cor, etapa.cor);
+
+  await persist('empreender');
+  res.json({ etapa, ...resposta(emp) });
+});
+
+// Remove a etapa e tudo que estava dentro dela.
+router.delete('/etapa/:id', async (req, res) => {
+  const emp = await garantir();
+  const etapa = emp.etapas.find((e) => e.id === req.params.id);
+  if (!etapa) return res.status(404).json({ error: 'Etapa não encontrada' });
+
+  for (const m of etapa.missoes) delete emp.progress[m.id];
+  emp.etapas = emp.etapas.filter((e) => e.id !== req.params.id);
+
+  await persist('empreender');
+  res.json({ removidas: etapa.missoes.length, ...resposta(emp) });
+});
+
+// Sobe ou desce a etapa na trilha. body: { direcao: 'cima' | 'baixo' }
+router.patch('/etapa/:id/mover', async (req, res) => {
+  const emp = await garantir();
+  const i = emp.etapas.findIndex((e) => e.id === req.params.id);
+  if (i === -1) return res.status(404).json({ error: 'Etapa não encontrada' });
+
+  const destino = req.body.direcao === 'cima' ? i - 1 : i + 1;
+  if (destino < 0 || destino >= emp.etapas.length) return res.json(resposta(emp));
+
+  const [etapa] = emp.etapas.splice(i, 1);
+  emp.etapas.splice(destino, 0, etapa);
+
+  await persist('empreender');
+  res.json(resposta(emp));
+});
+
+// ── Missões ───────────────────────────────────────────────────────────────────
+
+router.post('/etapa/:etapaId/missao', async (req, res) => {
+  const emp = await garantir();
+  const etapa = emp.etapas.find((e) => e.id === req.params.etapaId);
+  if (!etapa) return res.status(404).json({ error: 'Etapa não encontrada' });
+
+  const { titulo, descricao, pontos } = req.body;
+  if (!titulo || !String(titulo).trim())
+    return res.status(400).json({ error: 'Título é obrigatório' });
+
+  const missao = {
+    id: makeId('missao'),
+    titulo: String(titulo).trim(),
+    descricao: String(descricao || '').trim(),
+    pontos: parsePontos(pontos, 10),
+  };
+  etapa.missoes.push(missao);
+  await persist('empreender');
+  res.json({ missao, ...resposta(emp) });
+});
+
+// Edita qualquer missão — inclusive as que vieram na trilha inicial.
+// body: { titulo?, descricao?, pontos?, done?, nota?, etapaId? }
+router.patch('/missao/:id', async (req, res) => {
+  const emp = await garantir();
+  const achado = acharMissao(emp, req.params.id);
+  if (!achado) return res.status(404).json({ error: 'Missão não encontrada' });
+  const { etapa, missao } = achado;
+  const { titulo, descricao, pontos, done, nota, etapaId } = req.body;
+
+  if (titulo !== undefined && String(titulo).trim()) missao.titulo = String(titulo).trim();
+  if (descricao !== undefined) missao.descricao = String(descricao).trim();
+  if (pontos !== undefined) missao.pontos = parsePontos(pontos, missao.pontos);
+
+  // Mudar de etapa: tira de uma lista e põe na outra.
+  if (etapaId !== undefined && etapaId !== etapa.id) {
+    const destino = emp.etapas.find((e) => e.id === etapaId);
+    if (!destino) return res.status(400).json({ error: 'Etapa de destino não existe' });
+    etapa.missoes = etapa.missoes.filter((m) => m.id !== missao.id);
+    destino.missoes.push(missao);
+  }
+
+  if (done !== undefined || nota !== undefined) {
+    const atual = emp.progress[missao.id] || { done: false, nota: '', completedAt: null };
+    if (done !== undefined) {
+      atual.done = Boolean(done);
+      atual.completedAt = atual.done ? new Date().toISOString() : null;
+    }
+    if (nota !== undefined) atual.nota = String(nota);
+    emp.progress[missao.id] = atual;
+  }
+
+  await persist('empreender');
+  res.json({ missao, progressoMissao: emp.progress[missao.id] || null, ...resposta(emp) });
+});
+
+router.delete('/missao/:id', async (req, res) => {
+  const emp = await garantir();
+  const achado = acharMissao(emp, req.params.id);
+  if (!achado) return res.status(404).json({ error: 'Missão não encontrada' });
+
+  achado.etapa.missoes = achado.etapa.missoes.filter((m) => m.id !== req.params.id);
+  delete emp.progress[req.params.id];
+
+  await persist('empreender');
+  res.json(resposta(emp));
+});
+
+// Restaura a trilha inicial sem apagar o que ela criou nem o progresso:
+// devolve só as etapas e missões de fábrica que tiverem sido removidas.
+router.post('/restaurar', async (req, res) => {
+  const emp = await garantir();
+  let etapasVoltaram = 0, missoesVoltaram = 0;
+
+  for (const base of TRILHA_INICIAL) {
+    let etapa = emp.etapas.find((e) => e.id === base.id);
+    if (!etapa) {
+      etapa = { id: base.id, nome: base.nome, descricao: base.descricao, cor: base.cor, missoes: [] };
+      emp.etapas.push(etapa);
+      etapasVoltaram++;
+    }
+    for (const m of base.missoes) {
+      if (!acharMissao(emp, m.id)) {
+        etapa.missoes.push({ ...m });
+        missoesVoltaram++;
       }
     }
   }
 
-  const atual = [...NIVEIS].reverse().find((n) => pontos >= n.minimo) || NIVEIS[0];
-  const proximo = NIVEIS.find((n) => n.minimo > pontos) || null;
-
-  return { pontos, pontosPossiveis, feitas, total, nivel: atual, proximoNivel: proximo };
-}
-
-// GET /api/empreender
-router.get('/', (_req, res) => {
-  const { progress } = getEmpreender();
-  const etapas = montarEtapas();
-  res.json({ etapas, progress, niveis: NIVEIS, ...calcular(etapas, progress) });
-});
-
-// PATCH /api/empreender/missao/:id  body: { done?, nota? }
-router.patch('/missao/:id', async (req, res) => {
-  const emp = getEmpreender();
-  const etapas = montarEtapas();
-  const existe = etapas.some((e) => e.missoes.some((m) => m.id === req.params.id));
-  if (!existe) return res.status(404).json({ error: 'Missão não encontrada' });
-
-  const atual = emp.progress[req.params.id] || { done: false, nota: '', completedAt: null };
-  const { done, nota } = req.body;
-
-  if (done !== undefined) {
-    atual.done = Boolean(done);
-    atual.completedAt = atual.done ? new Date().toISOString() : null;
-  }
-  if (nota !== undefined) atual.nota = String(nota);
-
-  emp.progress[req.params.id] = atual;
   await persist('empreender');
-
-  res.json({ missao: { id: req.params.id, ...atual }, ...calcular(etapas, emp.progress) });
-});
-
-// POST /api/empreender/missao  body: { titulo, descricao, etapa, pontos }
-router.post('/missao', async (req, res) => {
-  const { titulo, descricao, etapa, pontos } = req.body;
-  if (!titulo || !String(titulo).trim())
-    return res.status(400).json({ error: 'Título é obrigatório' });
-  if (!ETAPAS.some((e) => e.id === etapa))
-    return res.status(400).json({ error: 'Etapa inválida' });
-
-  const emp = getEmpreender();
-  const missao = {
-    id: `propria-${makeId()}`,
-    titulo: String(titulo).trim(),
-    descricao: String(descricao || '').trim(),
-    etapa,
-    pontos: parsePontos(pontos, 10),
-  };
-  emp.custom.push(missao);
-  await persist('empreender');
-
-  const etapas = montarEtapas();
-  res.json({ missao, etapas, ...calcular(etapas, emp.progress) });
-});
-
-// DELETE /api/empreender/missao/:id — só as suas próprias
-router.delete('/missao/:id', async (req, res) => {
-  const emp = getEmpreender();
-  const antes = emp.custom.length;
-  emp.custom = emp.custom.filter((m) => m.id !== req.params.id);
-  if (emp.custom.length === antes)
-    return res.status(404).json({ error: 'Só dá para remover missões que você criou' });
-
-  delete emp.progress[req.params.id];
-  await persist('empreender');
-
-  const etapas = montarEtapas();
-  res.json({ etapas, progress: emp.progress, ...calcular(etapas, emp.progress) });
+  res.json({ etapasVoltaram, missoesVoltaram, ...resposta(emp) });
 });
 
 module.exports = router;

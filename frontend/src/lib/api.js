@@ -301,21 +301,45 @@ export async function setRoutineHours(date, activityId, hours) {
 export async function fetchEmpreender() {
   return apiFetch('/api/empreender');
 }
-// data: { done?, nota? }
-export async function updateMissao(id, data) {
-  return apiFetch(`/api/empreender/missao/${id}`, {
+
+// Etapas
+export async function addEtapa(data) {
+  return apiFetch('/api/empreender/etapa', { method: 'POST', body: JSON.stringify(data) });
+}
+// data: { nome?, descricao?, cor? }
+export async function updateEtapa(id, data) {
+  return apiFetch(`/api/empreender/etapa/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+export async function removeEtapa(id) {
+  return apiFetch(`/api/empreender/etapa/${id}`, { method: 'DELETE' });
+}
+// direcao: 'cima' | 'baixo'
+export async function moverEtapa(id, direcao) {
+  return apiFetch(`/api/empreender/etapa/${id}/mover`, {
     method: 'PATCH',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ direcao }),
   });
 }
-export async function addMissao(data) {
-  return apiFetch('/api/empreender/missao', {
+
+// Missões
+export async function addMissao(etapaId, data) {
+  return apiFetch(`/api/empreender/etapa/${etapaId}/missao`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
 }
+// data: { titulo?, descricao?, pontos?, done?, nota?, etapaId? }
+export async function updateMissao(id, data) {
+  return apiFetch(`/api/empreender/missao/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
 export async function removeMissao(id) {
   return apiFetch(`/api/empreender/missao/${id}`, { method: 'DELETE' });
+}
+
+// Devolve as etapas e missões de fábrica que tiverem sido apagadas,
+// sem mexer no que você criou nem no progresso.
+export async function restaurarTrilha() {
+  return apiFetch('/api/empreender/restaurar', { method: 'POST' });
 }
 
 // ========== Busca por Palavras-chave ==========
