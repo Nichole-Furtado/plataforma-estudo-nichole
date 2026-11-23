@@ -15,6 +15,7 @@ const state = {
   financeiro: {},
   lembretes: [],
   checklist: { habits: [], weeks: {} },
+  empreender: { progress: {}, custom: [] },
 };
 
 async function init() {
@@ -34,6 +35,7 @@ async function init() {
   state.financeiro = await store.load('financeiro', {});
   state.lembretes = await store.load('lembretes', []);
   state.checklist = await store.load('checklist', { habits: [], weeks: {} });
+  state.empreender = await store.load('empreender', { progress: {}, custom: [] });
 
   console.log(`✅ Dados carregados (${state.modules.length} módulos)`);
 }

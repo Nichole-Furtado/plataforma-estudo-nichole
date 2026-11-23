@@ -14,6 +14,7 @@ const searchRouter = require('./routes/search');
 const authRouter = require('./routes/auth');
 const lembretesRouter = require('./routes/lembretes');
 const checklistRouter = require('./routes/checklist');
+const empreenderRouter = require('./routes/empreender');
 const setupSocket = require('./socket');
 const { init } = require('./state');
 const { verifyToken } = require('./lib/token');
@@ -60,6 +61,7 @@ app.use('/api/admin', requireAuth, adminRouter);
 app.use('/api/search', requireAuth, searchRouter);
 app.use('/api/lembretes', requireAuth, lembretesRouter);
 app.use('/api/checklist', requireAuth, checklistRouter);
+app.use('/api/empreender', requireAuth, empreenderRouter);
 
 const PORT = process.env.PORT || 4000;
 
